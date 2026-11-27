@@ -529,7 +529,7 @@ function zeichneBedienung() {
       const el = document.createElement('div');
       el.className = 'chip' + (hz >= b.von && hz <= b.bis ? ' on' : '');
       el.textContent = b.n;
-      el.onclick = () => { link.send(`vfo:${state.trx},0,${b.mitte}`);
+      el.onclick = () => { if (!vfoSenden(b.mitte)) { return; }
         wasserfallSchnitt(); letzteMitteHz = b.mitte; };
       $('bands').appendChild(el);
     });
@@ -1802,6 +1802,8 @@ $('scope').addEventListener('pointermove', (e) => {
   const weg = e.clientX - wischVon;
   if (!wischAktiv) {
     if (Math.abs(weg) < kWischTotzone) return;
+    // Gesperrt: das Bild bleibt stehen, nur die Marke LOCK leuchtet auf.
+    if (vfoGesperrt()) { sperreAnstossen(); wischVon = null; return; }
     wischAktiv = true;
     // Das Bild festhalten, solange der Finger unten ist.
     //
@@ -1846,7 +1848,7 @@ $('scope').addEventListener('pointermove', (e) => {
   const jetzt = performance.now();
   if (jetzt - wischLetzt < kWischAbstandMs) return;
   wischLetzt = jetzt;
-  link.send(`vfo:${state.trx},0,${neu}`);
+  vfoSenden(neu);
 });
 // ── Filterkanten ziehen (2026-11-25) ─────────────────────────────────────────
 //
@@ -1986,11 +1988,33 @@ $('zoomRaus').addEventListener('click', () => spanneStufe(+1));
 // sein um die frequenz um +/- 100 zu verschieben". Wischen trifft auf ein
 // paar hundert Hertz genau — fuer das letzte Stueck auf eine Station ist das
 // zu grob, und das Eintippblatt ist dafuer zu umstaendlich.
+// ── VFO-Sperre (2026-11-27) ─────────────────────────────────────────────────
+// Wie LOCK am Mac: `lock:rx,true|false` (TciProtocol::handleLockCommand ->
+// SliceModel::setLocked). Ist sie an, schickt die Seite KEIN `vfo:` mehr --
+// Wischen, Tippen, Spots, Band, Eintippen, Feinschritt laufen alle ueber
+// vfoSenden(). Der Zustand kommt nur vom Server (Init-Burst, Gegenmeldung).
+const vfoGesperrt = () => link.st.lock[state.trx] === true;
+function sperreZeigen() {
+  const an = vfoGesperrt();
+  $('sperrMarke').toggleAttribute('hidden', !an);
+  $('sperre').classList.toggle('on', an);
+  document.querySelector('.vfo').classList.toggle('gesperrt', an);
+}
+function sperreAnstossen() {
+  // Kurz aufleuchten lassen: der Griff kam an, gedreht wird nicht.
+  const m = $('sperrMarke');
+  m.classList.remove('stoss'); void m.offsetWidth; m.classList.add('stoss');
+}
+function vfoSenden(hz) {
+  if (vfoGesperrt()) { sperreAnstossen(); return false; }
+  link.send(`vfo:${state.trx},0,${hz}`);
+  return true;
+}
 let kFeinHz = 100;          // die Schritt-Chips stellen ihn (schrittSetzen)
 function feinschritt(d) {
   const v = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : null;
   if (!v) { return; }
-  link.send(`vfo:${state.trx},0,${v + d}`);
+  vfoSenden(v + d);
   // Nicht selbst schieben — mitteVerfolgen() tut es, sobald das Geraet die
   // neue Frequenz bestaetigt. Zweimal schieben hiesse doppelt schieben.
 }
@@ -2531,7 +2555,7 @@ function qsySchliessen() { $('qsy').classList.remove('an'); $('qsyFeld').blur();
 function qsySetzen() {
   const hz = hzAusEingabe($('qsyFeld').value);
   if (hz === null) { $('qsyFeld').value = ''; return; }
-  link.send(`vfo:${state.trx},0,${hz}`);
+  if (!vfoSenden(hz)) { qsySchliessen(); return; }
   // Wie beim Bandwechsel: ein Schnitt sagt, ab wo der neue Massstab gilt.
   wasserfallSchnitt(); letzteMitteHz = hz;
   qsySchliessen();
@@ -2616,7 +2640,7 @@ $('scope').addEventListener('pointerup', (e) => {
 
     const treffer = r.width ? trefferBei(spotMarken, xCanvas) : null;
     if (treffer) {
-      link.send(`vfo:${state.trx},0,${treffer.hz}`);
+      vfoSenden(treffer.hz);
       spotsBaldHolen();
       wischVon = null;
       return;
@@ -2624,7 +2648,7 @@ $('scope').addEventListener('pointerup', (e) => {
     const ziel = frequenzAnStelle(e.clientX);
     if (ziel) {
       const vorher = link.st.vfo[state.trx] ? link.st.vfo[state.trx][0] : ziel;
-      link.send(`vfo:${state.trx},0,${ziel}`);
+      vfoSenden(ziel);
       // Nicht hier schieben: mitteVerfolgen() tut es, sobald das Geraet die
       // neue Frequenz bestaetigt. Zweimal schieben hiesse doppelt schieben.
     }
@@ -2633,7 +2657,7 @@ $('scope').addEventListener('pointerup', (e) => {
   // Intervall Wegstrecke ungesendet geblieben sein, und dann steht das
   // Geraet ein Stueck neben dem, wo der Finger losgelassen hat.
   if (wischAktiv && wischZiel !== null) {
-    link.send(`vfo:${state.trx},0,${wischZiel}`);
+    vfoSenden(wischZiel);
     // Auch hier nicht selbst schieben — siehe mitteVerfolgen().
   }
   wischVon = null; wischAktiv = false; wischZiel = null;
@@ -3588,6 +3612,20 @@ for (const [hz, t] of SCHRITTE) {
   c.type = 'button'; c.className = 'chip'; c.textContent = t; c.dataset.hz = String(hz);
   c.addEventListener('click', () => schrittSetzen(hz));
   $('schritte').appendChild(c);
+}
+// LOCK sitzt bei den Schritten: beides regelt, wie die Frequenz sich
+// bewegen darf. Umschalten nur ueber den Server; die Pille folgt `lock:`.
+{
+  const c = document.createElement('button');
+  c.type = 'button'; c.className = 'chip sperre'; c.id = 'sperre'; c.textContent = 'LOCK';
+  c.setAttribute('aria-label', 'Frequenz sperren');
+  c.addEventListener('click', () => {
+    if (!link.ready) { return; }
+    link.send(`lock:${state.trx},${vfoGesperrt() ? 'false' : 'true'}`);
+  });
+  $('schritte').appendChild(c);
+  link.addEventListener('state', sperreZeigen);
+  sperreZeigen();
 }
 {
   let gemerkt = 100;

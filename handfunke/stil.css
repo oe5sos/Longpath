@@ -872,3 +872,17 @@ footer #onAir.an{color:var(--tx-border)}
 .ft8Dreh:active{background:var(--or);color:#1a1205}
 .ft8Dreh:disabled{border-color:#2c2c31;color:#55555e}
 .ft8Wege{display:flex;gap:6px;flex:none}
+
+/* ═══ VFO-Sperre (2026-11-27) ═══════════════════════════════════════════════
+   LOCK als Pille bei den Schritten (an = orange gefuellt wie jede Auswahl);
+   neben „MHz" eine kleine Marke. Gesperrt wird die Frequenz etwas gedaempft,
+   ein vergeblicher Griff laesst die Marke kurz aufleuchten. Kein Rot. */
+#schritte .chip.sperre{margin-left:auto;letter-spacing:.1em}
+.vfo .unit{position:relative}
+.sperrMarke{position:absolute;left:0;bottom:calc(100% + 3px);font:600 9px/1 var(--mono);
+  letter-spacing:.14em;color:var(--measured);border:1px solid var(--amber-dim);
+  border-radius:5px;padding:2px 4px;white-space:nowrap}
+.sperrMarke[hidden]{display:none}
+.sperrMarke.stoss{animation:sperrStoss .6s ease-out}
+@keyframes sperrStoss{0%{background:rgba(216,165,95,.45);color:#111}100%{background:transparent}}
+.vfo.gesperrt .hz{opacity:.72}

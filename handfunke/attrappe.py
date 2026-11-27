@@ -204,6 +204,10 @@ INIT_BURST = [
     'tune:1,false;',
     'volume:-12.0;',
     'mute:false;',
+    # VFO-Sperre wie im echten Init-Burst (buildLockLine); --gesperrt setzt
+    # sie fuer die Entwurfsblaetter.
+    f'lock:0,{"true" if "--gesperrt" in sys.argv else "false"};',
+    'lock:1,false;',
     # RIT/XIT wie im echten Init-Burst (TciProtocol buildRitEnableLine & Co.).
     'rit_enable:0,true;',
     'rit_enable:1,false;',
@@ -633,7 +637,7 @@ class Verbindung(threading.Thread):
                       'rx_filter_band', 'trx', 'tune',
                       'rit_enable', 'xit_enable', 'rit_offset', 'xit_offset',
                       'rx_nb_enable', 'rx_anf_enable', 'sql_enable', 'sql_level',
-                      'agc_gain'):
+                      'agc_gain', 'lock'):
             # Wie der echte Server: setzen und die Gegenmeldung schicken,
             # damit der Client seinen Zustand NUR vom Server bekommt.
             if len(args) >= 2:
