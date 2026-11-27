@@ -11633,11 +11633,32 @@ void MainWindow::populateDefaultMeter()
                        << snap.value(QStringLiteral("floatingPans")).toMap().size()
                        << "rotor=" << snap.value(QStringLiteral("rotor")).toMap();
         }
+        // ── Werksvorgabe bei einer frischen Installation (2026-11-18) ──
+        //
+        // Betreiber: „ich finde, dass mein standard profil auch als
+        // ausgangsbasis herangezogen werden soll". Wer noch GAR KEINE
+        // Profile hat, bekommt seine Profile N und FT8 („nur N und F") aus
+        // der Ressource -- bereinigt und auf einen 1440x900-Schirm
+        // umgerechnet von tools/werksprofile_ziehen.py; der Profilrahmen
+        // zieht sie auf groesseren Schirmen hoch. Wer schon Profile hat,
+        // bekommt sie nie: ladeWerksvorgabe() prueft das selbst.
+        bool werksvorgabe = false;
+        if (m_layoutProfiles->names().isEmpty()) {
+            QFile vorgabe(LayoutProfiles::werksvorgabePfad());
+            if (vorgabe.open(QIODevice::ReadOnly)) {
+                werksvorgabe = m_layoutProfiles->ladeWerksvorgabe(vorgabe.readAll());
+            }
+            qWarning() << "[ProfileFactoryDefault]"
+                       << (werksvorgabe ? "uebernommen:" : "nicht uebernommen")
+                       << m_layoutProfiles->names();
+        }
         if (m_layoutProfiles->names().isEmpty()) {
             // Beim allerersten Start gibt es genau ein Profil, und es
             // hält, was gerade zu sehen ist. Ohne das stünde die
             // Schiene leer da und das Plus hieße „leg dir erst mal
             // etwas an" — dabei hat der Betreiber schon ein Fenster.
+            // Seit 2026-11-18 nur noch der Rueckfall, wenn die
+            // Werksvorgabe nicht zu lesen war.
             m_layoutProfiles->create(QStringLiteral("Standard"));
         } else if (!m_layoutProfiles->current().isEmpty()) {
             // NICHT activate(current()): dessen Namensgleich-Wache
