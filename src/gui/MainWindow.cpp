@@ -14830,14 +14830,52 @@ void MainWindow::buildStatusBar()
     // The StationCallsign AppSettings key is preserved on disk for a potential
     // future operator-callsign surface; it is no longer shown in status chrome.
     m_stationBlock = new StationBlock(barWidget);
-    // Ein/Aus-Schalter: verbunden -> Klick trennt, sonst Verbindungsfenster.
+    // ── Ein/Aus-Schalter (Entwurf A, 2026-11-27) ─────────────────────────
+    //
+    // Betreiber: „der ein und ausschalter unten in der taskleiste fehlt"
+    // und, am Entwurfsblatt, „a". The block is the radio's power switch:
+    //   on          → click switches off (disconnect)
+    //   connecting  → click does nothing (the attempt runs its course)
+    //   off         → click switches the LAST radio on, without the panel;
+    //                 only with nothing remembered does the panel open.
+    // A Flex is connected straight from its saved entry (the same thing the
+    // panel does); an OpenHPSDR radio goes through Radio > Connect, which
+    // probes the saved address first.
     connect(m_stationBlock, &StationBlock::clicked, this, [this]() {
-        if (m_radioModel->connectionState() == ConnectionState::Connected) {
+        const ConnectionState st = m_radioModel->connectionState();
+        if (st == ConnectionState::Connected) {
             m_radioModel->disconnectFromRadio();
+            return;
+        }
+        if (st == ConnectionState::Probing || st == ConnectionState::Connecting) {
+            return;
+        }
+        AppSettings& s = AppSettings::instance();
+        const auto saved = s.savedRadio(s.lastConnected());
+        if (!saved.has_value()) {
+            showConnectionPanel();
+            return;
+        }
+        if (saved->info.protocol == ProtocolVersion::Flex) {
+            m_stationBlock->setConnecting(true);
+            m_radioModel->connectToRadio(saved->info);
+            return;
+        }
+        if (m_actConnect && m_actConnect->isEnabled()) {
+            m_stationBlock->setConnecting(true);
+            m_actConnect->trigger();
             return;
         }
         showConnectionPanel();
     });
+    {
+        AppSettings& s = AppSettings::instance();
+        if (const auto saved = s.savedRadio(s.lastConnected())) {
+            m_stationBlock->setTargetName(saved->info.name.isEmpty()
+                                              ? saved->info.displayName()
+                                              : saved->info.name);
+        }
+    }
     connect(m_stationBlock, &StationBlock::contextMenuRequested,
             this, &MainWindow::showStationContextMenu);
     // Update the block's name on connection state changes.
@@ -14865,17 +14903,20 @@ void MainWindow::buildStatusBar()
         // und das feuert allein der OpenHPSDR-Weg. Eine Flex meldet nur
         // Connected; die Pille blieb auf „Click to connect" stehen und
         // war damit nie der Aus-Schalter. Darum hier auch beim Verbinden.
+        m_stationBlock->setConnecting(s == ConnectionState::Probing
+                                      || s == ConnectionState::Connecting);
+        if (s != ConnectionState::Connected
+            && !m_radioModel->lastRadioName().isEmpty()) {
+            // Off again: the name stays, as the radio a click switches on.
+            m_stationBlock->setTargetName(m_radioModel->lastRadioName());
+        }
         const QString name = (s == ConnectionState::Connected)
                                  ? m_radioModel->lastRadioName()
                                  : QString();
-        if (s == ConnectionState::Connected && name.isEmpty()) {
-            return;
+        // Connected without a name (should not happen): keep what is shown.
+        if (!(s == ConnectionState::Connected && name.isEmpty())) {
+            m_stationBlock->setRadioName(name);
         }
-        if (s == ConnectionState::Connected
-            && m_stationBlock->radioName() == name) {
-            return;
-        }
-        m_stationBlock->setRadioName(name);
         if (m_chromeBar && m_chromeBarWidget) {
             m_chromeBar->setNaturalWidth(
                 m_stationBlock, m_stationBlock->sizeHint().width());
