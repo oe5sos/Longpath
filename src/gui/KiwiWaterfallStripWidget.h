@@ -63,6 +63,7 @@ public:
     float maxDbm() const { return m_maxDbm; }
     QToolButton* closeButtonForTest() const { return m_closeButton; }
     QToolButton* expandButtonForTest() const { return m_expandButton; }
+    QToolButton* optionsButtonForTest() const { return m_optionsButton; }
     void setExpandedState(bool on);
     // Ton dieses Kiwi in den Lautsprechern (nur Anzeige; die Arbeit macht MainWindow).
     void setSoundActive(bool on);
@@ -120,6 +121,9 @@ private:
     int m_acceptedRows{0};
     QToolButton* m_closeButton{nullptr};
     QToolButton* m_expandButton{nullptr};
+    QToolButton* m_optionsButton{nullptr};
+    // Tempo, Pegelbereich usw. -- Zahnrad und Rechtsklick.
+    void showOptionsMenu(const QPoint& globalPos);
     QToolButton* m_soundButton{nullptr};
     QToolButton* m_zoomIn{nullptr};
     QToolButton* m_zoomOut{nullptr};

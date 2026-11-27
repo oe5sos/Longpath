@@ -8720,6 +8720,14 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
 <context>
     <name>Longpath::KiwiWaterfallStripWidget</name>
     <message>
+        <source>Speed and level range of the Kiwi waterfalls</source>
+        <translation>Tempo und Pegelbereich der Kiwi-Wasserfälle</translation>
+    </message>
+    <message>
+        <source>Waterfall options</source>
+        <translation>Wasserfall-Optionen</translation>
+    </message>
+    <message>
         <source>Enlarge this waterfall to the whole window (click again to go back)</source>
         <translation>Dieses Diagramm auf das ganze Fenster vergrößern (nochmal klicken: zurück)</translation>
     </message>

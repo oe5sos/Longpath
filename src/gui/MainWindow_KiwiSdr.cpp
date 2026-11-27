@@ -544,6 +544,7 @@ SliceModel* MainWindow::assignKiwiProfileToSlice(const QString& id)
             // nach dem Verbinden.
             const int id = m_radioModel->addSlice(QString(), true);
             slice = m_radioModel->sliceById(id);
+            if (slice) { m_kiwiCreatedSlices.insert(id); }
             qCInfo(lcKiwiSdr) << "Keine Scheibe vorhanden — fuer den "
                                  "KiwiSDR eine angelegt, Kennung" << id;
         }
@@ -776,6 +777,16 @@ void MainWindow::wireKiwiSdr()
             [this](int sliceId, const QString& profileId) {
         rewireKiwiSdrTrackingForSlice(sliceId, profileId);
         refreshKiwiSdrAppletReceivers();
+        // Kiwi-Scheiben sind keine Empfaenger des Betreibers (2026-11-27:
+        // "oben in der Bandwidth soll nichts angezeigt werden").
+        if (m_radioModel) {
+            for (SliceModel* s : m_radioModel->slices()) {
+                if (s) {
+                    s->setListenOnly(!m_kiwiSdrManager
+                        ->assignedProfileForSlice(s->sliceIndex()).isEmpty());
+                }
+            }
+        }
     });
 
     // ── Stufe 5: der Ton in die Mischung ──────────────────────────────

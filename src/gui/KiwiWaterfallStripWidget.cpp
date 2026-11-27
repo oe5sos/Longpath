@@ -139,6 +139,25 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
             [this](bool on) { emit soundToggled(m_profileId, on); });
     header->addWidget(m_soundButton, 0);
 
+    // Optionen rechts oben, sichtbar (Betreiber 2026-11-27: "Geschwindigkeit
+    // Wasserfall Kiwi sehr langsam" -- einstellbar war sie nur per Rechtsklick).
+    m_optionsButton = new QToolButton(this);
+    m_optionsButton->setText(QStringLiteral("\u2699"));
+    m_optionsButton->setAutoRaise(true);
+    m_optionsButton->setCursor(Qt::PointingHandCursor);
+    m_optionsButton->setToolTip(tr("Speed and level range of the Kiwi waterfalls"));
+    m_optionsButton->setAccessibleName(tr("Waterfall options"));
+    m_optionsButton->setFixedSize(20, 18);
+    m_optionsButton->setStyleSheet(QStringLiteral(
+        "QToolButton { color: %1; border: none; font-size: 13px; }"
+        "QToolButton:hover { color: %2; }")
+            .arg(QString::fromLatin1(Style::kTextSecondary), ink()));
+    connect(m_optionsButton, &QToolButton::clicked, this, [this]() {
+        showOptionsMenu(m_optionsButton->mapToGlobal(
+            QPoint(0, m_optionsButton->height())));
+    });
+    header->addWidget(m_optionsButton, 0);
+
     // Vergroessern: dieser Streifen fuellt das ganze Fenster (Splatter sehen).
     m_expandButton = new QToolButton(this);
     m_expandButton->setText(QStringLiteral("\u2922"));
@@ -353,6 +372,11 @@ void KiwiWaterfallStripWidget::setAutoRange(bool on)
 
 void KiwiWaterfallStripWidget::contextMenuEvent(QContextMenuEvent* event)
 {
+    showOptionsMenu(event->globalPos());
+}
+
+void KiwiWaterfallStripWidget::showOptionsMenu(const QPoint& globalPos)
+{
     QMenu menu(this);
     QAction* rename = menu.addAction(tr("Rename …"));
     menu.addSeparator();
@@ -388,7 +412,7 @@ void KiwiWaterfallStripWidget::contextMenuEvent(QContextMenuEvent* event)
     }
     menu.addSeparator();
     QAction* close = menu.addAction(tr("Remove waterfall"));
-    QAction* chosen = menu.exec(event->globalPos());
+    QAction* chosen = menu.exec(globalPos);
     if (!chosen) { return; }
     if (chosen == rename) {
         emit renameRequested(m_profileId);

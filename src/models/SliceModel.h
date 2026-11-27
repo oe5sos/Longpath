@@ -823,6 +823,16 @@ public:
     // needs to observe or bind to it.
     bool suppressAutoStreamBinding() const { return m_suppressAutoStreamBinding; }
     void setSuppressAutoStreamBinding(bool v) { m_suppressAutoStreamBinding = v; }
+    // Eine Scheibe, die nur einen fremden Mithoer-Empfaenger traegt
+    // (KiwiSDR): kein Empfaenger des Betreibers, Ansichten wie der
+    // Bandfilter zeigen sie nicht.
+    bool listenOnly() const { return m_listenOnly; }
+    void setListenOnly(bool v)
+    {
+        if (m_listenOnly == v) { return; }
+        m_listenOnly = v;
+        emit listenOnlyChanged(v);
+    }
     double shiftOffsetHz() const { return m_shiftOffsetHz; }
     void setShiftOffsetHz(double hz);
 
@@ -1352,6 +1362,7 @@ public slots:
 
 signals:
     void frequencyChanged(double freq);
+    void listenOnlyChanged(bool listenOnly);
     // Phase 3P-II Task 64: emitted when frequency crosses a ham-band boundary.
     // Uses Band::bandFromFrequency(freq) to detect crossings; emits once per
     // distinct Band change. Consumed by MainWindow to notify PgxlConnection.
@@ -1562,6 +1573,7 @@ private:
     // parameter); cleared the moment bindUnboundSlices() places a real
     // radio there, so a genuine later takeover resumes normal placement.
     bool   m_suppressAutoStreamBinding{false};
+    bool   m_listenOnly{false};
     double m_shiftOffsetHz{0.0};  // offset from stream centre
     int     m_sampleRateHz{kDefaultSampleRate};  // Phase 3F: per-slice DDC sample rate; default 192 kHz (Longpath::kDefaultSampleRate)
     bool    m_diversityEnabled{false};  // Phase 3F: Slice-A-only diversity mode; gated on BoardCapabilities.hasDiversityReceiver

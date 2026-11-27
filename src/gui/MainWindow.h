@@ -275,6 +275,7 @@ public:
     void stopKiwiRecordingForTest() { stopKiwiRecording(); }
     void setKiwiReplayForTest(bool on) { setKiwiReplay(on); }
     void kiwiOwnSignalTxEdgeForTest(bool on) { kiwiOwnSignalTxEdge(on); }
+    void closeKiwiForTest(const QString& id) { closeKiwi(id); }
     const KiwiReplayBuffer& kiwiReplayForTest() const { return m_kiwiReplay; }
     class KiwiRecording* kiwiRecordingForTest() const { return m_kiwiRecording; }
     // Wo werde ich gehoert: Mithoerer ohne Verzeichnisdialog.
@@ -2380,6 +2381,7 @@ private:
     bool m_kiwiAppletRefreshDirty{false};
     QHash<QString, double> m_kiwiViewSpanHz;   // Bereich je Kiwi-Streifen (Hz)
     QHash<QString, int> m_kiwiSoundSlices;   // Profil -> Scheibe, die wir fuer den Ton anlegten
+    QSet<int> m_kiwiCreatedSlices;   // weitere eigens fuer einen Kiwi angelegte Scheiben
     QTimer* m_kiwiSoloTimer{nullptr};   // Solo geht nach 30 s von selbst aus
     bool m_kiwiSoloOn{false};
     bool m_radioMuted{false};

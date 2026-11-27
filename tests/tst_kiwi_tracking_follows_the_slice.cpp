@@ -21,6 +21,8 @@
 #include "core/KiwiSdrManager.h"
 #include "gui/MainWindow.h"
 #include "gui/KiwiWaterfallPanel.h"
+#include "gui/applets/BandwidthFilterApplet.h"
+#include "gui/widgets/BandwidthFilterPane.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -202,6 +204,43 @@ private slots:
         QTest::qWait(1500);
         QVERIFY(!panel->stripForTest(b));
         QCOMPARE(mgr->assignedSliceForProfile(b), -1);
+        clearProfiles(mgr);
+    }
+
+    // 2026-11-27: "oben in der Bandwidth soll nichts angezeigt werden".
+    void kiwiScheibenStehenNichtImBandfilter()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        RadioModel* model = mw->radioModelForTest();
+        QVERIFY(mgr && model);
+        clearProfiles(mgr);
+        BandwidthFilterApplet filter(model);
+        const int eigene = model->addSlice();
+        QVERIFY(eigene >= 0);
+        const auto flaechen = [&filter]() {
+            return filter.findChildren<BandwidthFilterPane*>(
+                QString(), Qt::FindChildrenRecursively).size();
+        };
+        const int vorher = int(model->slices().size());
+        QTRY_COMPARE(flaechen(), vorher);
+
+        const QString a = mgr->addProfile(QStringLiteral("Eins"),
+                                          QStringLiteral("kiwi-e.example.at:8073"));
+        const QString b = mgr->addProfile(QStringLiteral("Zwei"),
+                                          QStringLiteral("kiwi-f.example.at:8073"));
+        mw->setKiwiSoundForTest(a, true);
+        mw->setKiwiSoundForTest(b, true);
+        QCOMPARE(int(model->slices().size()), vorher + 2);
+        QTest::qWait(50);
+        QCOMPARE(flaechen(), vorher);        // keine Flaeche je Kiwi
+        mw->closeKiwiForTest(a);
+        mw->closeKiwiForTest(b);
+        QCOMPARE(int(model->slices().size()), vorher);
         clearProfiles(mgr);
     }
 

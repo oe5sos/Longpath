@@ -452,17 +452,27 @@ void BandwidthFilterApplet::buildUI()
     root->addWidget(body);
 }
 
+QList<SliceModel*> BandwidthFilterApplet::shownSlices() const
+{
+    QList<SliceModel*> list;
+    if (!m_model) { return list; }
+    for (SliceModel* s : m_model->slices()) {
+        if (s && !s->listenOnly()) { list.append(s); }
+    }
+    return list;
+}
+
 SliceModel* BandwidthFilterApplet::sliceAt(int i) const
 {
-    if (!m_model) { return nullptr; }
-    const QList<SliceModel*> list = m_model->slices();
+    const QList<SliceModel*> list = shownSlices();
     return (i >= 0 && i < list.size()) ? list.at(i) : nullptr;
 }
 
 SliceModel* BandwidthFilterApplet::activeSlice() const
 {
     if (!m_model) { return nullptr; }
-    if (SliceModel* s = m_model->activeSlice()) { return s; }
+    SliceModel* s = m_model->activeSlice();
+    if (s && !s->listenOnly()) { return s; }
     return sliceAt(0);
 }
 
@@ -473,7 +483,7 @@ void BandwidthFilterApplet::rebuildPanes()
     // Mindestens EINE Flaeche, auch ohne Empfaenger. Eine leere Kachel
     // sieht aus wie ein Fehler; eine Flaeche, auf der „no radio" steht,
     // sagt, woran es liegt. Dieselbe Regel wie beim Panadapter-Kopf.
-    const int want = std::max<int>(1, static_cast<int>(m_model->slices().size()));
+    const int want = std::max<int>(1, static_cast<int>(shownSlices().size()));
 
     // Zu viele: die ueberzaehligen weg.
     while (m_panes.size() > want) {
@@ -519,6 +529,12 @@ void BandwidthFilterApplet::rebuildPanes()
     for (const QMetaObject::Connection& c : m_paneConns) { disconnect(c); }
     m_paneConns.clear();
     for (int i = 0; i < m_panes.size(); ++i) { wirePane(m_panes[i], i); }
+    // Wird eine Scheibe zum Mithoerer (oder wieder frei), aendert sich die
+    // Zahl der Flaechen.
+    for (SliceModel* s : m_model->slices()) {
+        m_paneConns.append(connect(s, &SliceModel::listenOnlyChanged, this,
+                [this](bool) { rebuildPanes(); }, Qt::QueuedConnection));
+    }
 
     for (int i = 0; i < m_panes.size(); ++i) { refreshPane(i); }
     refreshNumbers();

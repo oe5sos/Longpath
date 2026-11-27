@@ -626,8 +626,9 @@ void MainWindow::closeKiwi(const QString& profileId)
             audio->removeKiwiSdrAudioSource(sliceId);
         }
         m_kiwiSdrManager->clearSliceAssignment(sliceId);
-        // Nur die fuer seinen Ton angelegte Scheibe wieder wegraeumen.
-        if (m_kiwiSoundSlices.value(id, -1) == sliceId) {
+        // Nur eine eigens fuer ihn angelegte Scheibe wieder wegraeumen.
+        const bool eigene = m_kiwiCreatedSlices.remove(sliceId);
+        if (eigene || m_kiwiSoundSlices.value(id, -1) == sliceId) {
             if (SliceModel* s = m_radioModel->sliceById(sliceId)) {
                 s->setSuppressAutoStreamBinding(false);
             }

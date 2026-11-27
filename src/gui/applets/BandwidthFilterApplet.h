@@ -122,6 +122,10 @@ private:
     /// Die beiden VAR-Knoepfe nachziehen: leer oder mit Breite.
     void refreshVarButtons();
 
+    // Die Empfaenger des Betreibers: ohne reine Mithoer-Scheiben (Kiwi).
+
+    QList<SliceModel*> shownSlices() const;
+
     SliceModel* sliceAt(int i) const;
     SliceModel* activeSlice() const;
 
