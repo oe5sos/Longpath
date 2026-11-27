@@ -9393,6 +9393,34 @@ void RadioModel::startFlexStreams()
                 }
             }
 
+            // ── Temperatur der Endstufe (2026-11-18) ────────────────
+            //
+            // Betreiber: „temperaturanzeige von den geräten wäre auch
+            // im bereich des logo longpath oben interessant".
+            //
+            // `PATEMP` lag seit dem ersten Tag im Messwertstrom und
+            // stand nur als Rohwert in der Protokollzeile, weil der
+            // Teiler nicht belegt war. Das ist er jetzt
+            // (`FlexVita::meterScaled`, degC). Der Wert geht denselben
+            // Weg wie bei der Hermes Lite: in `RadioStatus`, und von
+            // dort lesen ihn Kopf, Fussleiste und Diagnoseseite.
+            //
+            // Nur die Maschine selbst: eine angeschlossene Endstufe
+            // meldet unter der Quelle AMP ebenfalls Temperaturen, und
+            // die gehoeren nicht in dieses Feld
+            // (From AetherSDR MeterModel.cpp:163 [@d58e2b8a] —
+            // `def.source != "AMP" && def.name == "PATEMP"`).
+            for (const auto& s : w) {
+                const auto def = m_flexMesswertNamen.value(s.index);
+                if (def.first != QLatin1String("PATEMP")) { continue; }
+                if (m_flexMesswertQuellen.value(s.index)
+                        .startsWith(QLatin1String("AMP"))) { continue; }
+                if (const auto grad = FlexVita::meterScaled(s.raw, def.second)) {
+                    m_radioStatus.setPaTemperature(*grad);
+                }
+                break;
+            }
+
             // Hoechstens alle fuenf Sekunden eine Zeile: die Maschine
             // schiebt rund 30 Pakete je Sekunde.
             if (jetzt - m_flexMesswertZuletztGemeldet < 5000) { return; }
