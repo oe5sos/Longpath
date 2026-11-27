@@ -15,7 +15,7 @@ import { Sendetasten, SENDEN, TUNE, ablehnText } from './sendetaste.js';
 import { Zeichenbremse } from './ton-vorrang.js';
 import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
-import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassBlatt } from './instrument.js';
+import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassRund } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
          peilungAus, peilungLesen, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
@@ -2817,6 +2817,9 @@ const rotorSicherung = new RotorSicherung();
 let rotorStand = null;
 let rotorFeldAn = false;
 let rotorTakt = null;
+// Kleiner Kompass in der Instrumentenzeile, gezeichnet wie das S-Meter.
+const kompassK = kompassRund($('rotorKlein'), 'k');
+kompassK(null);
 
 function rotorStricheZeichnen() {
   const g = $('rotorStriche');
@@ -2848,10 +2851,7 @@ function rotorZeichnen() {
     $('rotorGrad').textContent = `${Math.round(rotorStand.grad)}°`;
     $('rotorGrad').classList.toggle('alt', !!alt);
     // Kleiner Kompass in der Instrumentenzeile: dieselben Werte, kein zweiter Weg.
-    const nk = $('rotorNadelK');
-    nk.setAttribute('x2', (Math.sin(rad) * 82).toFixed(2));
-    nk.setAttribute('y2', (-Math.cos(rad) * 82).toFixed(2));
-    nk.classList.toggle('alt', !!alt);
+    kompassK(rotorStand.grad, !!alt);
     $('rotorGradK').textContent = `${Math.round(rotorStand.grad)}°`;
     $('rotorGradK').classList.toggle('alt', !!alt);
   }
@@ -3625,7 +3625,6 @@ desktopStarten({ link, $, schrittHz: () => kFeinHz, logHolen: logListeHolen });
   // Zeigerinstrumente nach Longpath (instrument.js): S-Meter und SWR.
   const zeigerS = zeigerBauen($('gaugeSvg'), SIG_KLEIN, 's');
   zeigerS(null);
-  kompassBlatt($('rotorBlattK'));
   const rotorFeld = $('rotorFeld');
   $('rotorKopf').addEventListener('click', () => {
     const offen = rotorFeld.classList.toggle('offen');

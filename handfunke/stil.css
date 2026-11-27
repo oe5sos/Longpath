@@ -753,9 +753,9 @@ footer #onAir.an{color:var(--tx-border)}
 
 /* Zeigerinstrumente (instrument.js): Flaeche statt Ring */
 #gaugeSvg,#swrSvg{max-width:none;width:100%;margin:2px 0 0}
-#kompassBox #rotorKlein{max-width:70px}
+#kompassBox #rotorKlein{max-width:92px}
 .ring text{font:inherit;fill:inherit}
-@media (min-width: 900px){ #dtLinks #kompassBox #rotorKlein{max-width:96px} }
+@media (min-width: 900px){ #dtLinks #kompassBox #rotorKlein{max-width:112px} }
 
 
 /* ═══ Abstimmschritt und RIT/XIT (2026-11-25) ═══════════════════════════════
