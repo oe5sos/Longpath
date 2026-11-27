@@ -225,7 +225,12 @@ void CommandBar::addGroupWidget(const QString& caption, QWidget* w)
     // beginnen auf derselben Linie.
     beschriftung->setVisible(false);
     box->addWidget(beschriftung, 0, Qt::AlignLeft);
-    box->addWidget(w, 0, Qt::AlignLeft);
+    // Oben ausgerichtet, wie addGroup(): die Schiene beginnt auf der ersten
+    // Linie der Leiste. Ohne Ausrichtung wurde sie in der unteren Zeile
+    // mittig gesetzt, sobald die Filtergruppe fehlte (ohne Empfaenger), und
+    // rutschte zwischen die beiden Pillenreihen (Betreiber 2026-11-27: 13:49
+    // war richtig).
+    box->addWidget(w, 0, Qt::AlignLeft | Qt::AlignTop);
     m_gruppenWidgets.insert(w, box);
     // Ans Ende der Gruppen, also hinter die Rate -- wie bisher.
     m_boxen.append(box);
