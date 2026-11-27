@@ -14859,13 +14859,27 @@ void MainWindow::buildStatusBar()
     });
     connect(m_radioModel, &RadioModel::connectionStateChanged, this,
             [this](ConnectionState s) {
-        if (s != ConnectionState::Connected) {
-            m_stationBlock->setRadioName(QString());
-            if (m_chromeBar && m_chromeBarWidget) {
-                m_chromeBar->setNaturalWidth(
-                    m_stationBlock, m_stationBlock->sizeHint().width());
-                m_chromeBar->relayout(m_chromeBarWidget->width());
-            }
+        // Betreiber (2026-11-26/27): „der ein und ausschalter unten in
+        // der taskleiste fehlt ... er erscheint naemlich immer click to
+        // connect". Den Namen setzte bisher nur currentRadioChanged --
+        // und das feuert allein der OpenHPSDR-Weg. Eine Flex meldet nur
+        // Connected; die Pille blieb auf „Click to connect" stehen und
+        // war damit nie der Aus-Schalter. Darum hier auch beim Verbinden.
+        const QString name = (s == ConnectionState::Connected)
+                                 ? m_radioModel->lastRadioName()
+                                 : QString();
+        if (s == ConnectionState::Connected && name.isEmpty()) {
+            return;
+        }
+        if (s == ConnectionState::Connected
+            && m_stationBlock->radioName() == name) {
+            return;
+        }
+        m_stationBlock->setRadioName(name);
+        if (m_chromeBar && m_chromeBarWidget) {
+            m_chromeBar->setNaturalWidth(
+                m_stationBlock, m_stationBlock->sizeHint().width());
+            m_chromeBar->relayout(m_chromeBarWidget->width());
         }
     });
 
