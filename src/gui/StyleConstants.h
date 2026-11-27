@@ -1228,6 +1228,22 @@ inline QString titleBarStyle()
     // (kTitleGrad*) — hier ist nur der Schluss dunkler geworden.
     // Glas & Tiefe (2026-09-17): dazu eine Lichtkante am oberen Rand,
     // damit der Kopf eine Oberflaeche hat und nicht nur einen Verlauf.
+    //
+    // Blau-Gold (2026-11-24): eine Palette, die die Rolle „titlebar-glow“
+    // setzt, legt einen hellen Schimmer oben rechts an, der in den tiefen
+    // Grund ausläuft. Ohne die Rolle bleibt der Text unverändert.
+    const QString glow = Style::role("titlebar-glow", "");
+    if (!glow.isEmpty()) {
+        // Warmer Kern (Rolle „glow-warm\"), Blau als Mitte, dann der Grund:
+        // Schimmer oben rechts, der über Blau in den tiefen Grund ausläuft.
+        const QString warm = Style::role("glow-warm", glow.toLatin1().constData());
+        return QStringLiteral(
+            "background: qradialgradient(cx:0.92, cy:0, radius:1.0,"
+            " fx:0.92, fy:0, stop:0 %1, stop:0.35 %2, stop:1 %3);"
+            " border-bottom: 1px solid %4; border-top: 1px solid %5;"
+        ).arg(warm, glow, QLatin1String(kTitleGradBot), QLatin1String(kTitleBorder),
+              QLatin1String(kGlassLight));
+    }
     return QStringLiteral(
         "background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
         " stop:0 %1, stop:0.5 %2, stop:1 %3);"

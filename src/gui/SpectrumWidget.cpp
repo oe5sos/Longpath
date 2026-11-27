@@ -5632,7 +5632,24 @@ void SpectrumWidget::loadBackgroundSettings()
 // als keiner.
 void SpectrumWidget::paintBackgroundLayer(QPainter& p, const QRect& specRect)
 {
-    p.fillRect(specRect, m_bgFillColor);
+    // Blau-Gold (2026-11-26): eine Palette mit der Rolle „panadapter-glow\"
+    // legt einen hellen Schimmer oben rechts an, der in die Grundfarbe
+    // ausläuft. Nur wenn die Grundfarbe aus der Palette kommt — eine vom
+    // Betreiber gewählte Fläche bleibt flach. Ohne Rolle: wie bisher.
+    const QString glow = Style::role("panadapter-glow", "");
+    const QColor paletteFill(Style::role("panadapter-bg", Style::kPanadapterBg));
+    if (!glow.isEmpty() && !specRect.isEmpty() && m_bgFillColor == paletteFill) {
+        QRadialGradient grad(QPointF(specRect.right(), specRect.top()),
+                             specRect.width() * 0.85);
+        // Warmer Kern (Rolle „glow-warm\"), dann Blau, dann der Grund.
+        const QString warm = Style::role("glow-warm", glow.toLatin1().constData());
+        grad.setColorAt(0.0, QColor(warm));
+        grad.setColorAt(0.35, QColor(glow));
+        grad.setColorAt(1.0, m_bgFillColor);
+        p.fillRect(specRect, grad);
+    } else {
+        p.fillRect(specRect, m_bgFillColor);
+    }
     if (m_bgImage.isNull() || specRect.isEmpty()) { return; }
     if (m_bgScaledSize != specRect.size()) {
         const QImage expanded = m_bgImage.scaled(
