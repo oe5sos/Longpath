@@ -195,6 +195,44 @@ private slots:
         delete r;
     }
 
+    // 2026-11-27, Betreiber mit Flex: "am kiwi geklickt und er haengt
+    // wieder". Die Flex liefert ihr Bild ueber denselben Weg wie ein
+    // KiwiSDR; Pille und Menuehaken schalteten damit die einzige Quelle ab.
+    void dasBildDesFunkgeraetsLaesstSichNichtAbschalten()
+    {
+        PanadapterApplet applet(QStringLiteral("F"));
+        applet.resize(900, 400);
+        applet.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&applet, kFensterFrist));
+        SpectrumWidget* sw = applet.spectrumWidget();
+        SpectrumStatusOverlay* pillen = applet.statusOverlayForTest();
+        QVERIFY(sw && pillen);
+
+        // So macht es MainWindow_Flex beim Verbinden.
+        sw->setFremdbildVomGeraet(true);
+        sw->setKiwiDisplaySource(true);
+        QVERIFY2(!pillen->kiwiActive(), "keine KIWI-Pille fuer das Bild der Flex");
+
+        emit pillen->kiwiBadgeClicked();
+        QVERIFY2(sw->kiwiDisplaySource(), "ein Klick schaltet das Bild nicht ab");
+
+        QMenu* m = applet.buildDisplayMenuForTesting();
+        QAction* kiwi = nullptr;
+        for (QAction* a : m->actions()) {
+            if (a->text() == QStringLiteral("Display from the KiwiSDR")) { kiwi = a; }
+        }
+        QVERIFY(kiwi);
+        QVERIFY2(!kiwi->isEnabled() && !kiwi->isChecked(),
+                 "der Menuehaken ist an der Flex ohne Wirkung und sagt das");
+        delete m;
+
+        // Und so beim Trennen: dann geht es wieder aus.
+        sw->setFremdbildVomGeraet(false);
+        sw->setKiwiDisplaySource(false);
+        QVERIFY(!sw->kiwiDisplaySource());
+        QVERIFY(!pillen->kiwiActive());
+    }
+
     // Vor dem ersten Wert ein Strich; dann S-Stufe und Balken aus der
     // EINEN Skala (ReadingSource) -- dieselbe wie im S-Meter-Instrument.
     void dasSMeterZeigtSStufen()

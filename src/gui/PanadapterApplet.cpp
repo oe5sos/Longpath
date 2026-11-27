@@ -490,6 +490,12 @@ PanadapterApplet::PanadapterApplet(const QString& panId, QWidget* parent)
     // m_spectrum may already have been switched to the KiwiSDR source by
     // the persisted-key restore above, before this overlay existed.
     m_statusOverlay->setKiwiActive(m_spectrum->kiwiDisplaySource());
+    // Liefert das Funkgeraet selbst das Bild (Flex), steht keine
+    // KIWI-Pille da.
+    connect(m_spectrum, &SpectrumWidget::fremdbildVomGeraetChanged, this,
+            [this](bool vomGeraet) {
+        if (vomGeraet) { m_statusOverlay->setKiwiActive(false); }
+    });
 
     // Phase 3F: clicking anywhere in this pan makes it the active pan.
     //
@@ -956,7 +962,8 @@ bool PanadapterApplet::addKiwiSourceAction(QMenu* menu)
     if (!sw) { return false; }
     QAction* kiwiAct = menu->addAction(tr("Display from the KiwiSDR"));
     kiwiAct->setCheckable(true);
-    kiwiAct->setChecked(sw->kiwiDisplaySource());
+    kiwiAct->setChecked(sw->kiwiDisplaySource() && !sw->fremdbildVomGeraet());
+    kiwiAct->setEnabled(!sw->fremdbildVomGeraet());
     kiwiAct->setToolTip(
         tr("Shows the waterfall of the KiwiSDR assigned to this slice "
            "instead of the radio's."));

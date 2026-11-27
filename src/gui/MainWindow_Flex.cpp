@@ -1205,6 +1205,7 @@ void MainWindow::wireFlex()
         // Der Panadapter zeigt ab jetzt die fremde Quelle; Bins vom
         // (nicht vorhandenen) Geraet werden damit verworfen.
         if (SpectrumWidget* sw = m_radioModel->spectrumWidget()) {
+            sw->setFremdbildVomGeraet(true);
             sw->setKiwiDisplaySource(true);
         }
     });
@@ -1670,6 +1671,7 @@ void MainWindow::wireFlex()
             ae->removeFlexAudioSource(m_flexTargetSliceId);
         }
         if (SpectrumWidget* sw = m_radioModel ? m_radioModel->spectrumWidget() : nullptr) {
+            sw->setFremdbildVomGeraet(false);
             sw->setKiwiDisplaySource(false);
         }
         qCInfo(lcFlexGui) << "Flex-Ton von Scheibe" << m_flexTargetSliceId

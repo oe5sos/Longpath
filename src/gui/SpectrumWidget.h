@@ -1734,6 +1734,13 @@ public slots:
     void setKiwiDisplaySource(bool kiwi);
     bool kiwiDisplaySource() const { return m_kiwiDisplaySource; }
 
+    /// Das Funkgeraet selbst liefert sein Panadapterbild ueber den
+    /// Fremdweg (Flex). Solange das gilt, ist er die einzige Quelle: er
+    /// laesst sich nicht abschalten, keine KIWI-Pille steht dafuer da, und
+    /// gemerkt wird er nicht.
+    void setFremdbildVomGeraet(bool vomGeraet);
+    bool fremdbildVomGeraet() const { return m_fremdbildVomGeraet; }
+
     // NF-aware grid slot — wired to ClarityController::noiseFloorChanged in MainWindow.
     // From Thetis console.cs:46074-46086 [v2.10.3.13] tmrAutoAGC_Tick NF grid block.
     // Range delta uses std::abs() — abs incase //MW0LGE [2.9.0.7] [original inline comment from console.cs:46081]
@@ -2205,6 +2212,7 @@ signals:
     void spectrumRenderModeChanged(Longpath::SpectrumRenderMode mode);
     /// Die Lupe (+/-10 kHz um den VFO) wurde ein- oder ausgeschaltet.
     void passbandMagnifierChanged(bool on);
+    void fremdbildVomGeraetChanged(bool vomGeraet);
 
     /// Weitergereicht vom Rechtsklick-Menue (2026-08-18).
     void openSetupPageRequested(const QString& page);
@@ -2820,6 +2828,7 @@ private:
     double m_sampleRateHz{768000.0};    // DDC sample rate
     double m_zoomObergrenzeHz{0.0};     // 0 = Abtastrate, siehe zoomObergrenzeHz()
     bool   m_kiwiDisplaySource{false};  // Stufe 6: Geraet oder KiwiSDR
+    bool   m_fremdbildVomGeraet{false}; // Flex: siehe setFremdbildVomGeraet
     QString m_persistKey;               // leer = nichts merken
     // Nur waehrend updateKiwiSpectrumDbm gesetzt. Ohne dieses
     // Merkmal wuerde die Sperre gegen fremde Bins auch den

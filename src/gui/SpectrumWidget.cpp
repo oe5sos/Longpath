@@ -3839,6 +3839,9 @@ void SpectrumWidget::setBandEdgeColor(const QColor& c)
 void SpectrumWidget::setKiwiDisplaySource(bool kiwi)
 {
     if (m_kiwiDisplaySource == kiwi) { return; }
+    // An der Flex waere "aus" kein Umschalten, sondern ein stehender
+    // Panadapter (Betreiber 2026-10-29 und wieder 2026-11-27).
+    if (!kiwi && m_fremdbildVomGeraet) { return; }
     m_kiwiDisplaySource = kiwi;
 
     // Beim Wechsel wird der Wasserfall geleert. Sonst stuenden im Bild
@@ -3856,8 +3859,23 @@ void SpectrumWidget::setKiwiDisplaySource(bool kiwi)
     if (!m_persistKey.isEmpty()) {
         AppSettings::instance().setValue(
             m_persistKey + QStringLiteral("_KiwiDisplay"),
-            kiwi ? QStringLiteral("True") : QStringLiteral("False"));
+            kiwi && !m_fremdbildVomGeraet ? QStringLiteral("True")
+                                          : QStringLiteral("False"));
     }
+}
+
+void SpectrumWidget::setFremdbildVomGeraet(bool vomGeraet)
+{
+    if (m_fremdbildVomGeraet == vomGeraet) { return; }
+    m_fremdbildVomGeraet = vomGeraet;
+    // Ein frueher gemerktes "True" braechte beim naechsten Start die
+    // KIWI-Pille zurueck, obwohl nie ein KiwiSDR gewaehlt war.
+    if (vomGeraet && !m_persistKey.isEmpty()) {
+        AppSettings::instance().setValue(
+            m_persistKey + QStringLiteral("_KiwiDisplay"),
+            QStringLiteral("False"));
+    }
+    emit fremdbildVomGeraetChanged(vomGeraet);
 }
 
 void SpectrumWidget::updateKiwiSpectrumDbm(const QVector<float>& binsDbm,
