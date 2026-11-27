@@ -14,16 +14,9 @@ namespace Longpath {
 
 namespace {
 
-// Entwurf A (2026-11-27): the brass of the transmit key, three steps.
-constexpr auto kOffBorder   = "#3a4656";   // off: quiet slate
-constexpr auto kOffGlyph    = "#6a7888";
-constexpr auto kOffName     = "#8090a0";
-constexpr auto kBusyBrass   = "#8a6a30";   // connecting: dark brass (kTxKeyBottom)
-constexpr auto kOnBrass     = "#c9a04e";   // on: brass
-constexpr auto kOnKnopfBg   = "#1a1610";
-constexpr auto kOffKnopfBg  = "#12161e";
-constexpr auto kNameOn      = "#c8d8e8";
-constexpr auto kDim         = "#607080";
+// Entwurf A (2026-11-27): die Rollen stehen in StyleConstants.h.
+QColor farbe(const char* hex) { return QColor(QLatin1String(hex)); }
+QString text(const char* hex) { return QString::fromLatin1(hex); }
 
 } // namespace
 
@@ -79,9 +72,9 @@ protected:
     }
 
 private:
-    QColor m_ring{kOffBorder};
-    QColor m_glyph{kOffGlyph};
-    QColor m_grund{kOffKnopfBg};
+    QColor m_ring{farbe(Style::kNetzAusRand)};
+    QColor m_glyph{farbe(Style::kNetzAusZeichen)};
+    QColor m_grund{farbe(Style::kNetzAusGrund)};
     bool   m_leuchtet{false};
 };
 
@@ -212,32 +205,32 @@ void StationBlock::refresh()
     m_hardwareLabel->setText(status);
     m_hardwareLabel->setVisible(!status.isEmpty());
 
-    const QString border = an ? QString::fromLatin1(kOnBrass)
-                         : busy ? QString::fromLatin1(kBusyBrass)
-                                : QString::fromLatin1(kOffBorder);
-    const QString nameColour = (an || busy) ? QString::fromLatin1(kNameOn)
-                                            : QString::fromLatin1(kOffName);
-    const QString statusColour = busy ? QString::fromLatin1(kBusyBrass)
-                                      : QString::fromLatin1(kDim);
+    const QString border = an ? text(Style::kNetzEin)
+                         : busy ? text(Style::kTxKeyBottom)
+                                : text(Style::kNetzAusRand);
+    const QString nameColour = (an || busy) ? text(Style::kNetzName)
+                                            : text(Style::kNetzAusName);
+    const QString statusColour = busy ? text(Style::kTxKeyBottom)
+                                      : text(Style::kNetzLeise);
 
     setStyleSheet(Style::themed(QStringLiteral(
         "Longpath--StationBlock { border: 1px solid %1;"
-        " background: #0a0a14; border-radius: 7px; }"
+        " background: %4; border-radius: 7px; }"
         "QLabel#StationBlock_Label { color: %2; font-family: " LP_MONO_QSS ";"
         " font-size: 13px; font-weight: bold; background: transparent; border: none; }"
         "QLabel#StationBlock_Status { color: %3; font-size: 11px;"
         " background: transparent; border: none; }")
-        .arg(border, nameColour, statusColour)));
+        .arg(border, nameColour, statusColour, text(Style::kNetzFlaeche))));
 
     if (an) {
-        m_knopf->setFarben(QColor(kOnBrass), QColor(kOnBrass),
-                           QColor(kOnKnopfBg), true);
+        m_knopf->setFarben(farbe(Style::kNetzEin), farbe(Style::kNetzEin),
+                           farbe(Style::kNetzEinGrund), true);
     } else if (busy) {
-        m_knopf->setFarben(QColor(kBusyBrass), QColor(kBusyBrass),
-                           QColor(kOffKnopfBg), false);
+        m_knopf->setFarben(farbe(Style::kTxKeyBottom), farbe(Style::kTxKeyBottom),
+                           farbe(Style::kNetzAusGrund), false);
     } else {
-        m_knopf->setFarben(QColor(kOffBorder), QColor(kOffGlyph),
-                           QColor(kOffKnopfBg), false);
+        m_knopf->setFarben(farbe(Style::kNetzAusRand), farbe(Style::kNetzAusZeichen),
+                           farbe(Style::kNetzAusGrund), false);
     }
 }
 
