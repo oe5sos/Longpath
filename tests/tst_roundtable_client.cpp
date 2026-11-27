@@ -64,6 +64,11 @@
 // Modification history (Longpath):
 //   2026-11-14 - Uebernommen fuer Longpath von Martin Fischer (OE5SOS),
 //                KI-gestuetzt ueber Anthropic Claude.
+//   2026-11-27 - flush() wartet auf genau seine Marke statt auf „einen
+//                Rahmen mehr", und sagt beim Scheitern, was ankam
+//                (hiddenIsTheLastFrameBeforeTheClose rot auf macOS-CI,
+//                auch auf main). Martin Fischer, KI-gestuetzt ueber
+//                Anthropic Claude Code.
 // =================================================================
 // no-port-check: NereusSDR-original, in Longpath uebernommen.
 
@@ -372,21 +377,48 @@ bool TstRoundtableClient::waitFrames(FakeConnection* c, int n)
 
 bool TstRoundtableClient::flush(FakeConnection* c)
 {
+    // Longpath 2026-11-27: wait for THIS marker, not for "one frame more".
+    // A frame the client sent before the marker -- watchBand, sent the
+    // moment /v1/live connects -- can still be on its way to the fake
+    // server when flush() starts. Counting it as "the next frame" made
+    // hiddenIsTheLastFrameBeforeTheClose fail on macOS CI three runs in a
+    // row ('flush(live)' returned FALSE, last frame watchBand). Frames on
+    // one socket arrive in order, so once the marker is here, everything
+    // sent before it is here too -- which is what flush() promises.
     const int before = static_cast<int>(c->frames.size());
+    QJsonObject marker;
     if (c->path == QLatin1String("/v1/station")) {
         m_client->markMentionsSeen(++m_flushes);
+        marker = Wire::mentionsSeen(m_flushes);
     } else {
-        m_client->readRoom(QStringLiteral("usb-%1").arg(7000000 + ++m_flushes));
+        const QString room = QStringLiteral("usb-%1").arg(7000000 + ++m_flushes);
+        m_client->readRoom(room);
+        marker = Wire::watch(room);
     }
-    if (!waitFrames(c, before + 1)) {
+    const auto markerAt = [c, before, &marker]() -> int {
+        for (int i = before; i < c->frames.size(); ++i) {
+            if (c->frames.at(i) == marker) {
+                return i;
+            }
+        }
+        return -1;
+    };
+    if (!QTest::qWaitFor([&markerAt] { return markerAt() >= 0; }, kWaitMs)) {
+        // Say what did arrive, so a red CI run names the cause.
+        qWarning() << "flush: marker" << typeOf(marker) << "never arrived on" << c->path
+                   << "closed" << c->closed << "frames" << c->types()
+                   << "connections on this path" << m_server->count(c->path)
+                   << "link state" << static_cast<int>(m_client->linkState());
         return false;
     }
-    const QString type = typeOf(c->frames.last());
-    const bool marker = type == QLatin1String("mentionsSeen") || type == QLatin1String("watch");
-    if (marker) {
-        c->frames.removeLast();
+    const int at = markerAt();
+    c->frames.removeAt(at);
+    // Nothing may follow the marker that was sent before it.
+    if (at != c->frames.size()) {
+        qWarning() << "flush: frames after the marker on" << c->path << c->types();
+        return false;
     }
-    return marker;
+    return true;
 }
 
 FakeConnection* TstRoundtableClient::waitConnection(const QString& path, int nth)

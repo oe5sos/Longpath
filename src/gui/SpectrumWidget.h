@@ -2968,6 +2968,9 @@ private:
     // Recomputed by recomputeAverageAlphas() whenever fps or time changes.
     float       m_spectrumAverageAlpha{0.0f};
     float       m_waterfallAverageAlpha{0.0f};
+    // Zeitpunkt (ms) des letzten Spektrumrahmens, aus dem die Mittelung je
+    // eintreffendem Rahmen ihren Faktor rechnet (0 = noch keiner).
+    qint64      m_spectrumAlphaFrameMs{0};
 
     // ---- Task 2.1: Detector + Averaging split (handwave fix from 3G-8) ----
     // Ported from Thetis specHPSDR.cs:302-415 [v2.10.3.13].
