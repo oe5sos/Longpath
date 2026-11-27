@@ -292,6 +292,18 @@ QString setPanCenterCommand(const QString& panId, double hz)
         .arg(panId).arg(hz / 1.0e6, 0, 'f', 6);
 }
 
+QString setPanCenterBandwidthCommand(const QString& panId, double mitteHz,
+                                     double breiteHz)
+{
+    if (panId.isEmpty() || !(mitteHz > 0.0) || !(breiteHz > 0.0)) {
+        return QString();
+    }
+    return QStringLiteral("display pan set %1 center=%2 bandwidth=%3")
+        .arg(panId)
+        .arg(mitteHz / 1.0e6, 0, 'f', 6)
+        .arg(breiteHz / 1.0e6, 0, 'f', 6);
+}
+
 QString setWaterfallSetupCommand(const QString& waterfallId, bool rueckfall,
                                  int lineDurationRate)
 {
