@@ -49,6 +49,7 @@
 
 #include <QDateTime>
 #include <algorithm>
+#include <cmath>
 #include <QDir>
 #include <QFileInfo>
 #include <QPointer>
@@ -63,6 +64,13 @@ constexpr const char* kKeyKm = "KiwiOwnSignal/Km";
 // Durchlass des Kiwi in "Mein Signal" bei SSB (Hoerfrequenz).
 constexpr int kKiwiOwnSignalLowHz = 50;
 constexpr int kKiwiOwnSignalHighHz = 4000;
+// Nachhoeren: Laufzeit, wenn keine gemessen ist; Zugabe nach dem Loslassen;
+// Takt und Vorlauf beim Abspielen.
+constexpr int kReplayDefaultDelayMs = 2000;
+constexpr int kReplayTailExtraMs = 700;
+constexpr int kReplayTickMs = 50;
+constexpr int kReplayLeadMs = 300;
+constexpr const char* kKeyReplay = "KiwiOwnSignal/Replay";
 // Der Kiwi zeigt nie weniger als dies (er hat nur ganzzahlige Zoomstufen
 // und sein Bild wird ab etwa 10 kHz Breite unbrauchbar eng).
 constexpr double kMinViewHz = 10000.0;
@@ -133,6 +141,19 @@ void MainWindow::wireKiwiOwnSignal()
             [this](bool on) {
         if (on) { startKiwiRecording(); } else { stopKiwiRecording(); }
     });
+    m_kiwiReplayTail = new QTimer(this);
+    m_kiwiReplayTail->setSingleShot(true);
+    connect(m_kiwiReplayTail, &QTimer::timeout, this,
+            [this]() { startKiwiReplayPlayback(); });
+    m_kiwiReplayPlay = new QTimer(this);
+    m_kiwiReplayPlay->setInterval(kReplayTickMs);
+    connect(m_kiwiReplayPlay, &QTimer::timeout, this,
+            [this]() { feedKiwiReplayChunk(); });
+    connect(m_kiwiSdrApplet, &KiwiSdrApplet::replayToggled, this,
+            [this](bool on) { setKiwiReplay(on); });
+    setKiwiReplay(AppSettings::instance()
+                      .value(QLatin1String(kKeyReplay), QStringLiteral("False"))
+                      .toString() == QStringLiteral("True"));
     connect(m_kiwiSdrApplet, &KiwiSdrApplet::otherReceiverRequested, this,
             [this]() { chooseOtherKiwi(); });
 
@@ -170,6 +191,7 @@ void MainWindow::wireKiwiOwnSignal()
             && id == m_kiwiOwnProfileId) {
             m_kiwiRecording->feedAudio(pcm);
         }
+        if (id == m_kiwiOwnProfileId) { m_kiwiReplay.feed(pcm); }
     });
     connect(m_kiwiRecording, &KiwiRecording::aborted, this,
             [this](const QString& reason) {
@@ -316,6 +338,8 @@ void MainWindow::setKiwiOwnSignal(bool on)
 
     if (!on) {
         if (m_kiwiSoloOn) { setKiwiSolo(false); }
+        stopKiwiReplay();
+        m_kiwiReplaySending = false;
         m_kiwiOwnSignalOn = false;
         for (const QMetaObject::Connection& c : m_kiwiOwnConnections) {
             disconnect(c);
@@ -510,6 +534,107 @@ void MainWindow::kiwiOwnSignalTxEdge(bool sending)
     const KiwiHearMeMeter::Result r = m_kiwiHearMe->result();
     m_kiwiStrip->setVerdict(r);
     m_kiwiStrip->setDelay(r.delayMs, r.delayMeasured);
+    kiwiReplayTxEdge(sending, r.delayMs, r.delayMeasured);
+}
+
+// ── Nachhoeren ───────────────────────────────────────────────────────
+//
+// Betreiber 2026-11-27: "ich moechte auf den Kiwis deutlich mein Signal und
+// meinen Ton hoeren". Live kommt der Ton um die Laufzeit verzoegert, mitten
+// ins eigene Sprechen. Mit Nachhoeren bleibt der Kiwi beim Senden still,
+// wird mitgeschnitten und laeuft nach dem Loslassen ab; das Funkgeraet ist
+// so lange stumm.
+void MainWindow::setKiwiReplay(bool on)
+{
+    m_kiwiReplayOn = on;
+    AppSettings::instance().setValue(
+        QLatin1String(kKeyReplay),
+        on ? QStringLiteral("True") : QStringLiteral("False"));
+    if (m_kiwiSdrApplet) { m_kiwiSdrApplet->setReplayActive(on); }
+    if (!on) { stopKiwiReplay(); }
+}
+
+bool MainWindow::kiwiReplayHoldsLive(const QString& profileId) const
+{
+    return profileId == m_kiwiOwnProfileId
+        && (m_kiwiReplay.isRecording() || m_kiwiReplay.isPlaying());
+}
+
+void MainWindow::kiwiReplayTxEdge(bool sending, int delayMs, bool delayMeasured)
+{
+    if (sending == m_kiwiReplaySending) { return; }   // nur die Kante zaehlt
+    m_kiwiReplaySending = sending;
+    if (!m_kiwiReplayOn || !m_kiwiReplayTail) { return; }
+    if (sending) {
+        stopKiwiReplay();      // wer wieder tastet, bricht das Abspielen ab
+        m_kiwiReplay.begin();
+        return;
+    }
+    if (!m_kiwiReplay.isRecording()) { return; }
+    const int delay = delayMeasured && delayMs > 0 ? delayMs
+                                                   : kReplayDefaultDelayMs;
+    // Ohne Messung wird vorne nichts weggeschnitten: lieber etwas Stille
+    // davor als ein fehlender Satzanfang.
+    m_kiwiReplaySkipMs = delayMeasured && delayMs > 0 ? delayMs : 0;
+    m_kiwiReplayTail->start(delay + kReplayTailExtraMs);
+}
+
+void MainWindow::startKiwiReplayPlayback()
+{
+    m_kiwiReplay.finish(m_kiwiReplaySkipMs);
+    if (!m_kiwiReplay.isPlaying() || !m_kiwiOwnSignalOn || !m_kiwiSdrManager
+        || !m_radioModel || m_kiwiUserMuted.contains(m_kiwiOwnProfileId)) {
+        stopKiwiReplay();
+        return;
+    }
+    const int sliceId =
+        m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId);
+    if (!kiwiControllableSlice(sliceId)) { stopKiwiReplay(); return; }
+    if (AudioEngine* audio = m_radioModel->audioEngine()) {
+        audio->setKiwiSdrAudioSourceEnabled(sliceId, true);
+    }
+    m_kiwiReplayRadioWasMuted = m_radioMuted;
+    m_kiwiReplayMutedRadio = true;
+    setRadioMuted(true);
+    qCInfo(lcKiwiSdr) << "Nachhoeren:" << m_kiwiReplay.durationMs() << "ms";
+    m_kiwiReplayClock.start();
+    m_kiwiReplayFedMs = 0;
+    m_kiwiReplayPlay->start();
+    feedKiwiReplayChunk();
+}
+
+void MainWindow::feedKiwiReplayChunk()
+{
+    if (!m_kiwiReplay.isPlaying() || !m_kiwiSdrManager || !m_radioModel) {
+        stopKiwiReplay();
+        return;
+    }
+    const int sliceId =
+        m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId);
+    AudioEngine* audio = m_radioModel->audioEngine();
+    if (!audio || !kiwiControllableSlice(sliceId)) { stopKiwiReplay(); return; }
+    // Nach der Uhr nachliefern, mit etwas Vorlauf: ein verspaeteter Takt
+    // reisst sonst ein Loch in den Ton.
+    const int due = int(m_kiwiReplayClock.elapsed()) + kReplayLeadMs
+                    - m_kiwiReplayFedMs;
+    if (due <= 0) { return; }
+    const QByteArray part = m_kiwiReplay.nextChunk(due);
+    m_kiwiReplayFedMs += int(part.size() / KiwiReplayBuffer::kBytesPerMs);
+    const int db = kiwiVolumeDb(m_kiwiOwnProfileId);
+    audio->feedKiwiSdrAudioData(
+        sliceId, part, db == 0 ? 1.0f : float(std::pow(10.0, db / 20.0)));
+    if (!m_kiwiReplay.isPlaying()) { stopKiwiReplay(); }
+}
+
+void MainWindow::stopKiwiReplay()
+{
+    if (m_kiwiReplayTail) { m_kiwiReplayTail->stop(); }
+    if (m_kiwiReplayPlay) { m_kiwiReplayPlay->stop(); }
+    m_kiwiReplay.clear();
+    if (m_kiwiReplayMutedRadio) {
+        m_kiwiReplayMutedRadio = false;
+        setRadioMuted(m_kiwiReplayRadioWasMuted);
+    }
 }
 
 void MainWindow::startKiwiRecording()

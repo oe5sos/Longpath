@@ -640,6 +640,7 @@ set(CORE_SOURCES
     src/core/KiwiOwnSignal.cpp
     src/core/KiwiGroup.cpp
     src/core/KiwiRecording.cpp
+    src/core/KiwiReplayBuffer.cpp
     src/core/ReceivePresentationSync.cpp
     src/core/WdspEngine.cpp
     src/core/RxChannel.cpp

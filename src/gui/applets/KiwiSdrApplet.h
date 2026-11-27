@@ -87,6 +87,7 @@ public:
     // zurueck (die Setter blockieren ihr eigenes Signal).
     void setOwnSignalActive(bool active);
     void setRecordingActive(bool active);
+    void setReplayActive(bool active);
     // Name des Kiwi, an dem "Mein Signal" haengt; leer = noch keiner.
     void setOwnSignalReceiverName(const QString& name);
     // "Solo": nur der Kiwi aus den Lautsprechern (siehe AudioEngine::setSoloSlice).
@@ -101,6 +102,7 @@ protected:
 signals:
     void ownSignalToggled(bool on);
     void recordToggled(bool on);
+    void replayToggled(bool on);
     void otherReceiverRequested();
     void hearingRequested();
     void soloToggled(bool on);
@@ -131,6 +133,7 @@ private:
     QLabel* m_emptyLabel{nullptr};
     QPushButton* m_ownSignalButton{nullptr};
     QPushButton* m_recordButton{nullptr};
+    QPushButton* m_replayButton{nullptr};
     QPushButton* m_otherButton{nullptr};
     QPushButton* m_hearingButton{nullptr};
     QPushButton* m_soloButton{nullptr};

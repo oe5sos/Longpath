@@ -799,6 +799,9 @@ void MainWindow::wireKiwiSdr()
         const int sliceId =
             m_kiwiSdrManager->assignedSliceForProfile(profileId);
         if (!kiwiControllableSlice(sliceId)) { return; }
+        // Nachhoeren: waehrend der Sendung und beim Abspielen schweigt der
+        // laufende Ton dieses Kiwi.
+        if (kiwiReplayHoldsLive(profileId)) { return; }
         if (AudioEngine* audio = m_radioModel->audioEngine()) {
             const int db = kiwiVolumeDb(profileId);
             audio->feedKiwiSdrAudioData(

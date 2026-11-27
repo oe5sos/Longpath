@@ -25,6 +25,7 @@
 #include "core/AudioEngine.h"
 #include "core/KiwiRecording.h"
 #include "core/KiwiSdrManager.h"
+#include "core/KiwiReplayBuffer.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/MainWindow.h"
 #include "gui/applets/KiwiSdrApplet.h"
@@ -128,6 +129,49 @@ private slots:
         QVERIFY(!btn->isChecked());
         QVERIFY(tracked.count() >= 1);
         QCOMPARE(tracked.last().at(1).toDouble(), 7.2);
+    }
+
+    // Nachhoeren am Hauptfenster: tasten, Ton kommt, loslassen, abspielen --
+    // und danach ist der Radio-Ton wieder wie vorher.
+    void nachhoerenSpieltNachDemLoslassenAb()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        QVERIFY(mgr);
+        clearProfiles(mgr);
+        mw->addKiwiSdrReceiverForTest(QStringLiteral("Linz"),
+                                      QStringLiteral("kiwi.example.at:8073"));
+        const QString pid = mgr->profiles().first().id;
+        mw->setKiwiOwnSignalProfileForTest(pid, 38.0);
+        mw->setKiwiOwnSignalForTest(true);
+        QVERIFY(mw->kiwiOwnSignalOnForTest());
+
+        auto* knopf = mw->kiwiSdrAppletForTest()->findChild<QPushButton*>(
+            QStringLiteral("kiwiReplayButton"));
+        QVERIFY(knopf);
+        knopf->setChecked(true);
+        QVERIFY(!mw->radioMutedForTest());
+
+        const QByteArray sekunde(1000 * KiwiReplayBuffer::kBytesPerMs, '\0');
+        mw->kiwiOwnSignalTxEdgeForTest(true);
+        QVERIFY(mw->kiwiReplayForTest().isRecording());
+        emit mgr->decodedAudioReady(pid, sekunde);
+        mw->kiwiOwnSignalTxEdgeForTest(true);      // zweite Meldung, keine Kante
+        QCOMPARE(mw->kiwiReplayForTest().durationMs(), 1000);
+        mw->kiwiOwnSignalTxEdgeForTest(false);
+        QVERIFY(mw->kiwiReplayForTest().isRecording());   // Nachlauf
+
+        QTRY_VERIFY_WITH_TIMEOUT(mw->kiwiReplayForTest().isPlaying(), 6000);
+        QVERIFY(mw->radioMutedForTest());
+        QTRY_VERIFY_WITH_TIMEOUT(!mw->kiwiReplayForTest().isPlaying(), 6000);
+        QVERIFY(!mw->radioMutedForTest());
+        knopf->setChecked(false);
+        mw->setKiwiOwnSignalForTest(false);
+        clearProfiles(mgr);
     }
 
     void derTonBleibtImModusBeimSenden()

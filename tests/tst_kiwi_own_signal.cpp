@@ -17,6 +17,7 @@
 
 #include "core/KiwiOwnSignal.h"
 #include "core/KiwiSdrClient.h"
+#include "core/KiwiReplayBuffer.h"
 #include "core/KiwiRecording.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/StyleConstants.h"
@@ -148,6 +149,45 @@ private slots:
         QVERIFY(!C::soundStreamStalled(C::State::Connected, 0, t));
         QVERIFY(!C::soundStreamStalled(C::State::Waiting, t, t + 60000));
         QVERIFY(!C::soundStreamStalled(C::State::Camping, t, t + 60000));
+    }
+
+    // Nachhoeren: mitschneiden, die Laufzeit vorne weg, stueckweise abgeben.
+    void nachhoerenGibtDieSendungOhneLaufzeitZurueck()
+    {
+        KiwiReplayBuffer b;
+        const int ms = KiwiReplayBuffer::kBytesPerMs;
+        b.feed(QByteArray(100 * ms, 'x'));          // ohne begin: nichts
+        QCOMPARE(b.durationMs(), 0);
+        b.begin();
+        b.feed(QByteArray(1000 * ms, 'a'));          // Laufzeit
+        b.feed(QByteArray(2000 * ms, 'b'));          // die Sendung
+        QVERIFY(b.isRecording() && !b.isPlaying());
+        QVERIFY(b.nextChunk(100).isEmpty());
+        b.finish(1000);
+        QVERIFY(!b.isRecording() && b.isPlaying());
+        QCOMPARE(b.durationMs(), 2000);
+        const QByteArray erstes = b.nextChunk(500);
+        QCOMPARE(erstes.size(), qsizetype(500 * ms));
+        QCOMPARE(erstes.at(0), 'b');
+        QCOMPARE(b.nextChunk(5000).size(), qsizetype(1500 * ms));
+        QVERIFY(!b.isPlaying());
+        QVERIFY(b.nextChunk(100).isEmpty());
+    }
+
+    void nachhoerenBehaeltDasEndeEinerLangenSendung()
+    {
+        KiwiReplayBuffer b;
+        const int ms = KiwiReplayBuffer::kBytesPerMs;
+        b.begin();
+        for (int s = 0; s < 70; ++s) { b.feed(QByteArray(1000 * ms, char('A' + s % 20))); }
+        QCOMPARE(b.durationMs(), KiwiReplayBuffer::kMaxMs);
+        b.finish(0);
+        QCOMPARE(b.nextChunk(1).at(0), char('A' + 10));   // die ersten 10 s fehlen
+        // Laufzeit laenger als alles: nichts abzuspielen, kein Absturz
+        b.begin();
+        b.feed(QByteArray(100 * ms, 'z'));
+        b.finish(5000);
+        QVERIFY(!b.isPlaying());
     }
 
     void tonBleibtImModusBeimSenden()

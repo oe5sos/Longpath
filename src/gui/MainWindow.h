@@ -80,6 +80,8 @@
 #include "core/WdspTypes.h"
 #include "core/DigiFrequenzen.h"
 #include "core/KiwiGroup.h"
+#include "core/KiwiReplayBuffer.h"
+#include <QElapsedTimer>
 #include "gui/KiwiHearingDialog.h"
 #include "gui/applets/PanelAutomatik.h"
 
@@ -271,6 +273,9 @@ public:
     class KiwiSdrApplet* kiwiSdrAppletForTest() const { return m_kiwiSdrApplet; }
     void startKiwiRecordingForTest() { startKiwiRecording(); }
     void stopKiwiRecordingForTest() { stopKiwiRecording(); }
+    void setKiwiReplayForTest(bool on) { setKiwiReplay(on); }
+    void kiwiOwnSignalTxEdgeForTest(bool on) { kiwiOwnSignalTxEdge(on); }
+    const KiwiReplayBuffer& kiwiReplayForTest() const { return m_kiwiReplay; }
     class KiwiRecording* kiwiRecordingForTest() const { return m_kiwiRecording; }
     // Wo werde ich gehoert: Mithoerer ohne Verzeichnisdialog.
     bool addKiwiListenerForTest(const QString& id, double km = -1.0,
@@ -1700,6 +1705,13 @@ private:
     void syncKiwiOwnSignal();
     bool sendKiwiOwnSignalTracking();
     void kiwiOwnSignalTxEdge(bool sending);
+    // Nachhoeren: Kiwi waehrend der Sendung still mitschneiden, danach abspielen.
+    void setKiwiReplay(bool on);
+    void kiwiReplayTxEdge(bool sending, int delayMs, bool delayMeasured);
+    void startKiwiReplayPlayback();
+    void feedKiwiReplayChunk();
+    void stopKiwiReplay();
+    bool kiwiReplayHoldsLive(const QString& profileId) const;
     void startKiwiRecording();
     void stopKiwiRecording();
     // Wo werde ich gehoert (Entwurf B/C) -- MainWindow_KiwiGroup.cpp.
@@ -2342,6 +2354,16 @@ private:
     QVector<QMetaObject::Connection> m_kiwiOwnConnections;
     QPointer<class SpectrumWidget> m_kiwiOwnPan;
     QTimer* m_kiwiRecordTimer{nullptr};
+    KiwiReplayBuffer m_kiwiReplay;
+    bool m_kiwiReplayOn{false};
+    bool m_kiwiReplaySending{false};
+    int m_kiwiReplaySkipMs{0};
+    bool m_kiwiReplayRadioWasMuted{false};
+    bool m_kiwiReplayMutedRadio{false};
+    QElapsedTimer m_kiwiReplayClock;
+    int m_kiwiReplayFedMs{0};
+    QTimer* m_kiwiReplayTail{nullptr};
+    QTimer* m_kiwiReplayPlay{nullptr};
     // Wo werde ich gehoert: Mithoerer, ohne Scheibe, ohne Ton.
     KiwiGroup m_kiwiGroup;
     QPointer<KiwiHearingDialog> m_kiwiHearingDialog;

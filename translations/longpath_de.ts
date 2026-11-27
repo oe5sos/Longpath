@@ -2867,6 +2867,18 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
 <context>
     <name>Longpath::KiwiSdrApplet</name>
     <message>
+        <source>Replay</source>
+        <translation>Nachhören</translation>
+    </message>
+    <message>
+        <source>Replay my transmission</source>
+        <translation>Meine Sendung nachhören</translation>
+    </message>
+    <message>
+        <source>The Kiwi stays quiet while you transmit and plays your transmission back after you let go. Needs "My Signal".</source>
+        <translation>Der Kiwi bleibt beim Senden still und spielt Ihre Sendung nach dem Loslassen ab. Braucht „Mein Signal“.</translation>
+    </message>
+    <message>
         <source>Volume</source>
         <translation>Lautstärke</translation>
     </message>

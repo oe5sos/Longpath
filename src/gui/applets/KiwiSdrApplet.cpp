@@ -212,6 +212,13 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_recordButton->setCheckable(true);
     m_recordButton->setObjectName(QStringLiteral("kiwiRecordButton"));
     m_recordButton->setAccessibleName(tr("Record the Kiwi audio"));
+    m_replayButton = blueToggle(tr("Replay"), -1, 22);
+    m_replayButton->setCheckable(true);
+    m_replayButton->setObjectName(QStringLiteral("kiwiReplayButton"));
+    m_replayButton->setAccessibleName(tr("Replay my transmission"));
+    m_replayButton->setToolTip(
+        tr("The Kiwi stays quiet while you transmit and plays your "
+           "transmission back after you let go. Needs \"My Signal\"."));
     m_otherButton = blueToggle(tr("Other Kiwi …"), 112, 22);
     m_otherButton->setObjectName(QStringLiteral("kiwiOtherButton"));
     // Eine Schaltflaeche, kein Schalter: styledButton() macht jeden Knopf
@@ -221,6 +228,7 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
     m_otherButton->setAccessibleName(tr("Choose another Kiwi"));
     ownRow->addWidget(m_ownSignalButton, 1);
     ownRow->addWidget(m_recordButton, 1);
+    ownRow->addWidget(m_replayButton, 1);
     root->addLayout(ownRow);
     // Zweite Zeile: "Anderen Kiwi ..." mit dem gewaehlten Namen daneben --
     // in einer Zeile mit den zwei Schaltern wurde der Text abgeschnitten.
@@ -269,6 +277,8 @@ KiwiSdrApplet::KiwiSdrApplet(RadioModel* model, QWidget* parent)
             &KiwiSdrApplet::ownSignalToggled);
     connect(m_recordButton, &QPushButton::toggled, this,
             &KiwiSdrApplet::recordToggled);
+    connect(m_replayButton, &QPushButton::toggled, this,
+            &KiwiSdrApplet::replayToggled);
     connect(m_otherButton, &QPushButton::clicked, this,
             &KiwiSdrApplet::otherReceiverRequested);
     connect(m_soloButton, &QPushButton::toggled, this, &KiwiSdrApplet::soloToggled);
@@ -344,6 +354,12 @@ void KiwiSdrApplet::setOwnSignalActive(bool active)
 {
     const QSignalBlocker blocker(m_ownSignalButton);
     m_ownSignalButton->setChecked(active);
+}
+
+void KiwiSdrApplet::setReplayActive(bool active)
+{
+    const QSignalBlocker blocker(m_replayButton);
+    m_replayButton->setChecked(active);
 }
 
 void KiwiSdrApplet::setRecordingActive(bool active)
