@@ -4050,9 +4050,26 @@ void SpectrumWidget::updateSpectrumLinear(int receiverId,
                                      0.0,
                                      static_cast<double>(sliceCount),
                                      0.0);
+    // Mittelung je eintreffendem Rahmen: der Faktor kommt aus der GEMESSENEN
+    // Zeit seit dem letzten Rahmen, nicht aus der Anzeige-FPS. Die Anzeige
+    // laeuft mit 10 oder 30 fps, die Flex liefert etwa 25 Rahmen je Sekunde;
+    // mit dem FPS-Faktor wirkte die eingestellte Zeit deshalb um den
+    // Quotienten daneben. Bei genau einem Rahmen je 1/fps ist exp(-dt/tau)
+    // dasselbe wie der FPS-Faktor (Thetis specHPSDR.cs:358).
+    float alphaRahmen = m_spectrumAverageAlpha;
+    const qint64 jetztRahmenMs = QDateTime::currentMSecsSinceEpoch();
+    if (m_spectrumAlphaFrameMs > 0) {
+        const double dtSek = qBound(0.001,
+            static_cast<double>(jetztRahmenMs - m_spectrumAlphaFrameMs) / 1000.0,
+            1.0);
+        const double tauSek = qMax(m_spectrumAverageTimeMs, 1) / 1000.0;
+        alphaRahmen = qBound(0.0f,
+            static_cast<float>(std::exp(-dtSek / tauSek)), 1.0f);
+    }
+    m_spectrumAlphaFrameMs = jetztRahmenMs;
     m_spectrumAvenger.apply(m_displayLinearPixels,
                             avengerMode(m_spectrumAveraging),
-                            static_cast<double>(m_spectrumAverageAlpha),
+                            static_cast<double>(alphaRahmen),
                             dbmScale,
                             noCorrection,
                             false,
