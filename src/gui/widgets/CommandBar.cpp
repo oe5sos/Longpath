@@ -903,7 +903,7 @@ void CommandBar::setAntennenVerfuegbar(const QStringList& antennen)
         if (name != QStringLiteral("ANT3") && name != QStringLiteral("ANT4")) { continue; }
         const bool da = antennen.isEmpty() || antennen.contains(name);
         b->setEnabled(da);
-        b->setToolTip(da ? QString() : tr("Dieses Gerät führt %1 nicht").arg(name));
+        b->setToolTip(da ? QString() : tr("This radio does not offer %1").arg(name));
     }
 }
 

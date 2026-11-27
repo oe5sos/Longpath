@@ -401,7 +401,7 @@ void ProfileRail::rebuild()
         m_mehr->setStyleSheet(leistenStil());
         setzeMasse(m_mehr);
         m_mehr->setCursor(Qt::PointingHandCursor);
-        m_mehr->setToolTip(tr("Alle Profile"));
+        m_mehr->setToolTip(tr("All profiles"));
         connect(m_mehr, &QPushButton::clicked, this, &ProfileRail::zeigeAlleProfile);
         platziere(m_mehr, m_order.size());
     }
