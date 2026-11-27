@@ -106,7 +106,9 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 
 <div class="vfo">
   <span class="hz mono" id="hz">—<span class="khz"></span><span class="dez"></span></span>
-  <span class="unit">MHz</span>
+  <!-- VFO-Sperre (2026-11-27): LOCK steht frei ueber „MHz", solange Longpath
+       `lock:` true meldet; nimmt der vollen Zeile keine Breite weg. -->
+  <span class="unit">MHz<span class="sperrMarke" id="sperrMarke" hidden>LOCK</span></span>
   <span class="spacer"></span>
   <span class="b" id="band"></span>
   <button class="zoom" id="zoomRaus" aria-label="Ausschnitt vergroessern">−</button>
