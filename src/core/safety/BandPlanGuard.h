@@ -16,6 +16,13 @@
 //   2026-04-25 — Ported to C++20/Qt6 for NereusSDR by J.J. Boyd
 //                (KG4VCF), with AI-assisted transformation via
 //                Anthropic Claude Code.
+//   2026-11-17 — checkMoxAllowed: parameter `cwKeyedOutside` (default
+//                false) lets CWL/CWU pass the MODE check when the
+//                carrier is keyed outside Longpath's own TX chain
+//                (FlexRadio + `cw key`, src/core/cw/CwTastung);
+//                frequency and band checks unchanged. Longpath-original
+//                addition by Martin Fischer (OE5SOS), AI-assisted via
+//                Anthropic Claude.
 // =================================================================
 
 // --- From console.cs ---
@@ -197,10 +204,19 @@ public:
         QString reason; ///< empty when ok==true
     };
 
+    ///
+    /// \p cwKeyedOutside (Longpath, 2026-11-17): CWL/CWU pass the mode
+    /// check when -- and only when -- the caller states that the carrier is
+    /// keyed outside our own TX chain (the FlexRadio makes its CW itself,
+    /// keyed with `cw key`; src/core/cw/CwTastung). Longpath's own CW TX
+    /// (3M-2) is still not there, so the default stays false and every
+    /// other caller is refused exactly as before. Frequency and band checks
+    /// run unchanged either way -- this opens a mode, never a band edge.
     MoxCheckResult checkMoxAllowed(Region region, std::int64_t freqHz,
                                    DSPMode mode, Band rxBand, Band txBand,
                                    bool preventDifferentBand,
-                                   bool extended) const noexcept;
+                                   bool extended,
+                                   bool cwKeyedOutside = false) const noexcept;
 };
 
 } // namespace Longpath::safety

@@ -187,6 +187,8 @@ class RadioMicSource;
 class VaxTxMicSource;  // VAX TX consumer (added 2026-05-06).
 class CompositeTxMicRouter;
 class HotKeyBindings;
+class CwTastung;
+class FlexCwTastziel;
 // 3M-1c L.1 / L.2: forward declarations for the MicProfileManager bank
 // (chunk F) + the TwoToneController activation orchestrator (chunk I).
 class MicProfileManager;
@@ -546,6 +548,14 @@ public:
     // im Hauptfenster. Gelesen wird sie vom Hauptfenster, sobald dessen
     // Menues stehen (die Menue-Kuerzel sind fuer Tasten gesperrt).
     HotKeyBindings* hotKeyBindings() const { return m_hotKeyBindings.get(); }
+
+    // Die Morsetaste ueber MIDI (HaliKey, 2026-11-17). Hier aus demselben
+    // Grund wie die Tastenkuerzel: Setup-Seite und Geraet sehen dieselbe.
+    CwTastung* cwTastung() const { return m_cwTastung.get(); }
+    /// Darf MOX in CW durch die Betriebsarten-Pruefung? Nur, wenn die
+    /// Taste eingeschaltet ist, den Sender tasten soll und eine Flex
+    /// haengt -- die macht ihr CW selbst. Siehe BandPlanGuard.
+    bool cwTastwegOffen() const;
 
     // Die QSO-Aufnahme. Sie haengt an AudioEngine und TxWorkerThread,
     // sobald beide stehen — angeschlossen wird in wireConnectionSignals,
@@ -4108,6 +4118,10 @@ public:
     /// `isConnected()`: es gibt mehrere Geraeteklassen, und an der
     /// Flex kommen Bild und Ton ueber ganz andere Wege.
     bool istFlexVerbunden() const;
+    /// Hat die Maschine ihr `xmit 1` bekommen und noch kein `xmit 0`?
+    /// Nicht dasselbe wie `mox()`: `flexTasten` kann nach der Freigabe
+    /// noch nein sagen (Stehwelle, Transverter, Verriegelung).
+    bool flexGetastet() const { return m_flexGetastet; }
 
     /// Sende- und Abstimmleistung in Prozent (0..100).
     bool setzeFlexSendeleistung(int prozent);
@@ -4345,6 +4359,7 @@ private:
     QString              m_flexVerriegelungsGrund;
     QString              m_flexVerriegelungsQuelle;
     QString              m_flexSendescheibenId;
+    bool                 m_flexGetastet{false};   // xmit 1 ist draussen
     quint32              m_flexSendetonstromId{0};
     quint8               m_flexSendetonZaehler{0};
     QVector<float>       m_flexSendetonRest;
@@ -4496,6 +4511,9 @@ private:
     // der Router haelt einen nackten Zeiger auf die Quelle des Spielers.
     std::unique_ptr<VoiceKeyerPlayer> m_voiceKeyerPlayer;
     std::unique_ptr<HotKeyBindings> m_hotKeyBindings;
+    // Das Ziel VOR der Tastung erklaert und damit NACH ihr zerstoert.
+    std::unique_ptr<FlexCwTastziel> m_cwTastziel;
+    std::unique_ptr<CwTastung> m_cwTastung;
     int m_dvkQuelleVorher{0};   // MicSource vor der Ansage
     QsoRecorderController m_qsoRecorder;
     RecordingModel        m_recording;
