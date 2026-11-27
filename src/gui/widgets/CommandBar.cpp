@@ -973,19 +973,14 @@ void CommandBar::buildStepGroup(QHBoxLayout* row)
     Group& g = addGroup(QStringLiteral("Step"), row);
     // Zweizeilig (Betreiber 2026-11-24: die Schrittweite braucht man
     // selten): 10 Hz · 100 Hz oben, 1 kHz · „…" darunter -- halb so breit.
-    QHBoxLayout* zweite = g.row2;
+    // addPill legt die zweite Zeile selbst an, sobald die dritte Pille kommt.
     for (int i = 0; i < kVisiblePerGroup && i < m_allSteps.size(); ++i) {
         const auto entry = m_allSteps.at(i);
         QPushButton* b = addPill(g, entry.first);
-        if (i >= 2) {
-            g.row->removeWidget(b);
-            zweite->addWidget(b);
-        }
         connect(b, &QPushButton::clicked, this, [this, entry]() {
             pushStepToModel(entry.second);
         });
     }
-    g.row2 = zweite;   // das „…" kommt in die zweite Zeile
 
     addOverflow(g, m_allSteps, [this](int hz) { pushStepToModel(hz); });
 }
