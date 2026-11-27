@@ -28,6 +28,7 @@
 #include <QVector>
 #include <QWidget>
 
+class QMenu;
 class QToolButton;
 
 namespace Longpath {
@@ -71,6 +72,30 @@ public:
     // Panadapter ist der Kiwi schoen, aber dort kann ich nichts aendern").
     // Ton ein/aus und Zoom +/- fuer den Kiwi von "Mein Signal".
     void setSoundActive(bool on);
+
+    // ── Ansicht, Zahnrad rechts oben (Betreiber 2026-11-27: "die Grafik
+    // und Geschwindigkeit des Wasserfalls aendern koennen") ────────────
+    struct Options {
+        int speed{-1};      // -1 wie das Fenster KIWI WASSERFAELLE,
+                            // 0 langsam, 1 normal, 2 schnell
+        int brightness{1};  // 0 dunkel, 1 normal, 2 hell
+        int contrast{1};    // 0 weich, 1 normal, 2 kraeftig
+        bool colour{false}; // Farbe statt Grau
+        bool trace{false};  // Spektrumlinie ueber dem Wasserfall
+        int height{0};      // 0 klein, 1 mittel, 2 gross
+    };
+    static constexpr int kHeights[3] = {176, 270, 380};
+    const Options& options() const { return m_opt; }
+    // Wendet an und merkt sich die Wahl.
+    void setOptions(const Options& options);
+    QMenu* buildOptionsMenu(QWidget* parent);
+    bool hasOwnSpeed() const { return m_opt.speed >= 0; }
+    // Zeilentakt, den der Kiwi dazu liefern soll (wf_speed; 0: Vorgabe).
+    int serverRate() const;
+    QToolButton* optionsButtonForTest() const { return m_gear; }
+    // Wo die Spektrumlinie steht (leer, wenn ausgeschaltet).
+    QRect traceRect() const;
+
     bool soundActiveForTest() const;
     double viewWidthHzForTest() const { return m_bandwidthHz; }
     double viewCenterHzForTest() const { return m_centerHz; }
@@ -98,6 +123,7 @@ public:
 
 signals:
     void soundToggled(bool on);
+    void speedChanged(int serverRate);
     void zoomRequested(int direction);   // +1 enger, -1 weiter
     void chooseOtherRequested();
 
@@ -113,7 +139,11 @@ private:
     };
 
     QRect bodyRect() const;
+    // Der Wasserfall: der ganze Koerper oder der Teil unter der Linie.
+    QRect waterfallRect() const;
     void renderBody(QImage& img) const;
+    void loadOptions();
+    void paintTrace(QPainter& p, const QRect& r) const;
     double noiseFloorDbm() const;
 
     QVector<Row> m_rows;       // [0] = neueste
@@ -133,6 +163,8 @@ private:
     int m_rowIntervalMs{0};
     qint64 m_lastRowMs{0};
     QToolButton* m_soundButton{nullptr};
+    QToolButton* m_gear{nullptr};
+    Options m_opt;
     QToolButton* m_zoomOut{nullptr};
     QToolButton* m_zoomIn{nullptr};
     KiwiLostOverlay* m_lost{nullptr};

@@ -129,6 +129,19 @@ void MainWindow::wireKiwiOwnSignal()
     });
     connect(m_kiwiStrip, &KiwiOwnSignalStrip::chooseOtherRequested, this,
             [this]() { chooseOtherKiwi(); });
+    // Tempo aus dem Zahnrad: auch der Kiwi selbst muss so oft liefern.
+    connect(m_kiwiStrip, &KiwiOwnSignalStrip::speedChanged, this,
+            [this](int rate) {
+        if (!m_kiwiSdrManager
+            || !m_kiwiSdrManager->hasProfile(m_kiwiOwnProfileId)) {
+            return;
+        }
+        const auto p = m_kiwiSdrManager->profile(m_kiwiOwnProfileId);
+        m_kiwiSdrManager->setProfileWaterfallDisplayRange(
+            m_kiwiOwnProfileId, p.waterfallMinDbm, p.waterfallMaxDbm,
+            p.waterfallAutoScale, rate);
+        sendKiwiOwnSignalTracking();
+    });
     connect(m_kiwiStrip, &KiwiOwnSignalStrip::zoomRequested, this,
             [this](int dir) {
         if (!m_kiwiOwnProfileId.isEmpty()) { zoomKiwiStrip(m_kiwiOwnProfileId, dir); }
@@ -167,11 +180,13 @@ void MainWindow::wireKiwiOwnSignal()
         }
         const double lowHz = lowMhz * 1.0e6;
         const double highHz = highMhz * 1.0e6;
-        m_kiwiStrip->setRowIntervalMs(
-            AppSettings::instance()
-                .value(QStringLiteral("KiwiWaterfall/RowIntervalMs"),
-                       QStringLiteral("250"))
-                .toString().toInt());
+        if (!m_kiwiStrip->hasOwnSpeed()) {
+            m_kiwiStrip->setRowIntervalMs(
+                AppSettings::instance()
+                    .value(QStringLiteral("KiwiWaterfall/RowIntervalMs"),
+                           QStringLiteral("250"))
+                    .toString().toInt());
+        }
         m_kiwiStrip->pushRow(bins, lowHz, highHz);
         m_kiwiHearMe->feedRow(bins, lowHz, highHz, kiwiOwnNowMs());
         const KiwiHearMeMeter::Result r = m_kiwiHearMe->result();

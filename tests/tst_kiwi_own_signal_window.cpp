@@ -295,10 +295,13 @@ private slots:
         strip.setSoundActive(false);
         QCOMPARE(tonSpy.count(), 1);
         const auto buttons = strip.findChildren<QToolButton*>();
-        QCOMPARE(buttons.size(), 3);
+        QCOMPARE(buttons.size(), 4);                // Ton, -, +, Zahnrad
         for (QToolButton* b : buttons) {
             QVERIFY(b->geometry().right() <= strip.width());
             QVERIFY(b->geometry().bottom() < 26);   // im Kopf
+            for (QToolButton* o : buttons) {        // und nicht uebereinander
+                QVERIFY(o == b || !o->geometry().intersects(b->geometry()));
+            }
         }
         Q_UNUSED(zoomSpy);
     }

@@ -8420,6 +8420,90 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
 <context>
     <name>Longpath::KiwiOwnSignalStrip</name>
     <message>
+        <source>View options of this Kiwi picture</source>
+        <translation>Ansicht dieses Kiwi-Bildes</translation>
+    </message>
+    <message>
+        <source>Kiwi view options</source>
+        <translation>Kiwi-Ansicht</translation>
+    </message>
+    <message>
+        <source>Waterfall speed</source>
+        <translation>Wasserfall-Tempo</translation>
+    </message>
+    <message>
+        <source>Like the Kiwi waterfall window</source>
+        <translation>Wie im Kiwi-Wasserfallfenster</translation>
+    </message>
+    <message>
+        <source>Slow</source>
+        <translation>Langsam</translation>
+    </message>
+    <message>
+        <source>Normal</source>
+        <translation>Normal</translation>
+    </message>
+    <message>
+        <source>Fast</source>
+        <translation>Schnell</translation>
+    </message>
+    <message>
+        <source>Height</source>
+        <translation>Höhe</translation>
+    </message>
+    <message>
+        <source>Small</source>
+        <translation>Klein</translation>
+    </message>
+    <message>
+        <source>Medium</source>
+        <translation>Mittel</translation>
+    </message>
+    <message>
+        <source>Large</source>
+        <translation>Groß</translation>
+    </message>
+    <message>
+        <source>Brightness</source>
+        <translation>Helligkeit</translation>
+    </message>
+    <message>
+        <source>Dark</source>
+        <translation>Dunkel</translation>
+    </message>
+    <message>
+        <source>Normal brightness</source>
+        <translation>Normal</translation>
+    </message>
+    <message>
+        <source>Bright</source>
+        <translation>Hell</translation>
+    </message>
+    <message>
+        <source>Contrast</source>
+        <translation>Kontrast</translation>
+    </message>
+    <message>
+        <source>Soft</source>
+        <translation>Weich</translation>
+    </message>
+    <message>
+        <source>Normal contrast</source>
+        <translation>Normal</translation>
+    </message>
+    <message>
+        <source>Strong</source>
+        <translation>Kräftig</translation>
+    </message>
+    <message>
+        <source>Coloured waterfall</source>
+        <translation>Farbiger Wasserfall</translation>
+    </message>
+    <message>
+        <source>Spectrum line above the waterfall</source>
+        <translation>Spektrumlinie über dem Wasserfall</translation>
+    </message>
+    <message>
         <source>Sound</source>
         <translation>Ton</translation>
     </message>

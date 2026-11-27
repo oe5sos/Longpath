@@ -13,6 +13,9 @@
 // Longpath-eigener Pruefstand, kein Port.
 #include <QtTest>
 #include <QImage>
+#include <QToolButton>
+#include <QSignalSpy>
+#include <QMenu>
 #include <QTemporaryDir>
 
 #include "core/KiwiOwnSignal.h"
@@ -315,6 +318,63 @@ private slots:
         QCOMPARE(m.result().verdict, KiwiHearMeMeter::Verdict::Unknown);
         m.reset();
         QCOMPARE(m.result().verdict, KiwiHearMeMeter::Verdict::Waiting);
+    }
+
+    // 2026-11-27: Tempo, Hoehe, Farbe und Spektrumlinie am Zahnrad.
+    void dasZahnradStelltDieAnsicht()
+    {
+        KiwiOwnSignalStrip s;
+        KiwiOwnSignalStrip::Options leer;
+        s.setOptions(leer);
+        s.resize(900, 176);
+        s.setView(14.2e6, 20000.0);
+        s.setMarkHz(14.2e6);
+        s.setKiwiName(QStringLiteral("Linz"));
+        QVERIFY(s.optionsButtonForTest());
+        QVERIFY(s.traceRect().isEmpty());
+        QVERIFY(!s.hasOwnSpeed());
+        QSignalSpy tempo(&s, &KiwiOwnSignalStrip::speedChanged);
+
+        auto waehle = [&s](const QString& text) {
+            QWidget host;
+            QMenu* m = s.buildOptionsMenu(&host);
+            QAction* hit = nullptr;
+            for (QAction* a : m->actions()) { if (a->text() == text) { hit = a; } }
+            QVERIFY2(hit, qPrintable(text));
+            hit->trigger();
+            delete m;
+        };
+        waehle(QStringLiteral("Fast"));
+        QCOMPARE(tempo.count(), 1);
+        QCOMPARE(tempo.last().at(0).toInt(), 4);
+        waehle(QStringLiteral("Spectrum line above the waterfall"));
+        QVERIFY(!s.traceRect().isEmpty());
+        QCOMPARE(s.height(), KiwiOwnSignalStrip::kHeights[1]);   // waechst mit
+        waehle(QStringLiteral("Coloured waterfall"));
+        waehle(QStringLiteral("Large"));
+        QCOMPARE(s.height(), KiwiOwnSignalStrip::kHeights[2]);
+
+        // Gemerkt: ein neuer Streifen kommt genauso.
+        KiwiOwnSignalStrip zweiter;
+        QCOMPARE(zweiter.options().speed, 2);
+        QVERIFY(zweiter.options().colour && zweiter.options().trace);
+        QCOMPARE(zweiter.height(), KiwiOwnSignalStrip::kHeights[2]);
+
+        // Ein Bild mit Signal, zum Ansehen.
+        for (int z = 0; z < 120; ++z) {
+            QVector<float> bins(1024, -112.0f);
+            for (int i = 0; i < bins.size(); ++i) { bins[i] += float((i * 7 + z * 13) % 9); }
+            if (z > 50) {
+                for (int i = 430; i < 512; ++i) {
+                    bins[i] = -72.0f + float((i * 5 + z * 3) % 17) - float(std::abs(i - 470)) * 0.35f;
+                }
+            }
+            s.pushRow(bins, 14.19e6, 14.21e6);
+        }
+        s.resize(900, KiwiOwnSignalStrip::kHeights[2]);
+        const QByteArray ziel = qgetenv("LONGPATH_BILD");
+        if (!ziel.isEmpty()) { QVERIFY(s.grab().save(QString::fromUtf8(ziel))); }
+        s.setOptions(leer);
     }
 
     void sWerteStimmen()

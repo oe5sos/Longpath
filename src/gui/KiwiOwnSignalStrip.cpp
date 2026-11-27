@@ -6,11 +6,16 @@
 
 #include "gui/KiwiOwnSignalStrip.h"
 
+#include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
 #include "gui/Zahlentext.h"
 #include "gui/widgets/KiwiLostOverlay.h"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QDateTime>
+#include <QMenu>
+#include <QPainterPath>
 #include <QPainter>
 #include <QSignalBlocker>
 #include <QResizeEvent>
@@ -36,6 +41,33 @@ QColor warm()   { return QColor(Style::role("trace", Style::kSpectrumTrace)); }
 QColor markRed(){ return QColor(Style::kRedBorder); }
 QColor okGreen(){ return QColor(Style::kGreenText); }
 QColor warnAmber(){ return QColor(Style::kAmberWarn); }
+
+// Helligkeit: Abstand der untersten Stufe vom Rauschen; Kontrast: Spanne.
+constexpr double kFloorOffsetDb[3] = {+3.0, -4.0, -12.0};
+constexpr double kSpanDbByContrast[3] = {55.0, 39.0, 25.0};
+// Zeilentakt im Bild je Tempo (ms) und wf_speed beim Kiwi (0: Vorgabe).
+constexpr int kRowMsBySpeed[3] = {1000, 250, 0};
+constexpr int kServerRateBySpeed[3] = {1, 0, 4};
+
+// Wasserfallfarben von Nachtblau ueber Gruen und Gelb nach Rot, wie man es
+// vom Panadapter kennt.
+QRgb colourFor(double t)
+{
+    struct Stop { double at; int r, g, b; };
+    static constexpr Stop s[] = {
+        {0.00, 6, 8, 36},     {0.30, 16, 52, 150}, {0.52, 0, 150, 160},
+        {0.68, 60, 200, 80},  {0.82, 232, 214, 52}, {1.00, 224, 62, 44},
+    };
+    for (int i = 1; i < 6; ++i) {
+        if (t <= s[i].at) {
+            const double u = (t - s[i - 1].at) / (s[i].at - s[i - 1].at);
+            auto mix = [u](int a, int b) { return int(a + u * (b - a)); };
+            return qRgb(mix(s[i - 1].r, s[i].r), mix(s[i - 1].g, s[i].g),
+                        mix(s[i - 1].b, s[i].b));
+        }
+    }
+    return qRgb(224, 62, 44);
+}
 
 // "38 km", "1,4 s" -- mit der Schreibweise der Oberflaeche.
 QString kmText(double km)
@@ -97,6 +129,18 @@ KiwiOwnSignalStrip::KiwiOwnSignalStrip(QWidget* parent) : QWidget(parent)
     m_soundButton->setFixedHeight(18);
     m_soundButton->setStyleSheet(btnStyle);
     connect(m_soundButton, &QToolButton::toggled, this, [this](bool on) { emit soundToggled(on); });
+    m_gear = new QToolButton(this);
+    m_gear->setText(QStringLiteral("\u2699"));
+    m_gear->setCursor(Qt::PointingHandCursor);
+    m_gear->setToolTip(tr("View options of this Kiwi picture"));
+    m_gear->setAccessibleName(tr("Kiwi view options"));
+    m_gear->setFixedSize(22, 18);
+    m_gear->setStyleSheet(btnStyle);
+    connect(m_gear, &QToolButton::clicked, this, [this]() {
+        QMenu* menu = buildOptionsMenu(window());
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->popup(m_gear->mapToGlobal(QPoint(0, m_gear->height())));
+    });
     m_lost = new KiwiLostOverlay(this);
     connect(m_lost, &KiwiLostOverlay::chooseRequested, this,
             &KiwiOwnSignalStrip::chooseOtherRequested);
@@ -105,6 +149,173 @@ KiwiOwnSignalStrip::KiwiOwnSignalStrip(QWidget* parent) : QWidget(parent)
     setObjectName(QStringLiteral("kiwiOwnSignalStrip"));
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    loadOptions();
+}
+
+void KiwiOwnSignalStrip::loadOptions()
+{
+    AppSettings& st = AppSettings::instance();
+    auto num = [&st](const char* key, int fallback, int lo, int hi) {
+        bool ok = false;
+        const int v = st.value(QLatin1String(key), QString::number(fallback))
+                          .toString().toInt(&ok);
+        return ok ? std::clamp(v, lo, hi) : fallback;
+    };
+    m_opt.speed = num("KiwiOwnSignal/Strip/Speed", -1, -1, 2);
+    m_opt.brightness = num("KiwiOwnSignal/Strip/Brightness", 1, 0, 2);
+    m_opt.contrast = num("KiwiOwnSignal/Strip/Contrast", 1, 0, 2);
+    m_opt.colour = num("KiwiOwnSignal/Strip/Colour", 0, 0, 1) == 1;
+    m_opt.trace = num("KiwiOwnSignal/Strip/Trace", 0, 0, 1) == 1;
+    m_opt.height = num("KiwiOwnSignal/Strip/Height", 0, 0, 2);
+    if (m_opt.speed >= 0) { m_rowIntervalMs = kRowMsBySpeed[m_opt.speed]; }
+    if (m_opt.height > 0) { setFixedHeight(kHeights[m_opt.height]); }
+}
+
+void KiwiOwnSignalStrip::setOptions(const Options& o)
+{
+    const Options old = m_opt;
+    m_opt.speed = std::clamp(o.speed, -1, 2);
+    m_opt.brightness = std::clamp(o.brightness, 0, 2);
+    m_opt.contrast = std::clamp(o.contrast, 0, 2);
+    m_opt.colour = o.colour;
+    m_opt.trace = o.trace;
+    m_opt.height = std::clamp(o.height, 0, 2);
+
+    AppSettings& st = AppSettings::instance();
+    auto put = [&st](const char* key, int v) {
+        st.setValue(QLatin1String(key), QString::number(v));
+    };
+    put("KiwiOwnSignal/Strip/Speed", m_opt.speed);
+    put("KiwiOwnSignal/Strip/Brightness", m_opt.brightness);
+    put("KiwiOwnSignal/Strip/Contrast", m_opt.contrast);
+    put("KiwiOwnSignal/Strip/Colour", m_opt.colour ? 1 : 0);
+    put("KiwiOwnSignal/Strip/Trace", m_opt.trace ? 1 : 0);
+    put("KiwiOwnSignal/Strip/Height", m_opt.height);
+
+    if (m_opt.height != old.height) { setFixedHeight(kHeights[m_opt.height]); }
+    if (m_opt.speed >= 0) { m_rowIntervalMs = kRowMsBySpeed[m_opt.speed]; }
+    m_lost->setGeometry(bodyRect());
+    update();
+    if (m_opt.speed != old.speed) { emit speedChanged(serverRate()); }
+}
+
+int KiwiOwnSignalStrip::serverRate() const
+{
+    return m_opt.speed >= 0 ? kServerRateBySpeed[m_opt.speed] : 0;
+}
+
+QMenu* KiwiOwnSignalStrip::buildOptionsMenu(QWidget* parent)
+{
+    auto* menu = new QMenu(parent);
+    // Eine Gruppe aus Haken, von denen genau einer sitzt.
+    auto choice = [this, menu](const QString& title, const QStringList& texts,
+                               int current, int first,
+                               void (*set)(Options&, int)) {
+        menu->addSection(title);
+        auto* group = new QActionGroup(menu);
+        for (int i = 0; i < texts.size(); ++i) {
+            const int value = first + i;
+            QAction* a = menu->addAction(texts.at(i));
+            a->setCheckable(true);
+            a->setChecked(value == current);
+            group->addAction(a);
+            connect(a, &QAction::triggered, this, [this, set, value]() {
+                Options o = m_opt;
+                set(o, value);
+                setOptions(o);
+            });
+        }
+    };
+    choice(tr("Waterfall speed"),
+           {tr("Like the Kiwi waterfall window"), tr("Slow"), tr("Normal"), tr("Fast")},
+           m_opt.speed, -1, [](Options& o, int v) { o.speed = v; });
+    choice(tr("Height"), {tr("Small"), tr("Medium"), tr("Large")},
+           m_opt.height, 0, [](Options& o, int v) { o.height = v; });
+    choice(tr("Brightness"), {tr("Dark"), tr("Normal brightness"), tr("Bright")},
+           m_opt.brightness, 0, [](Options& o, int v) { o.brightness = v; });
+    choice(tr("Contrast"), {tr("Soft"), tr("Normal contrast"), tr("Strong")},
+           m_opt.contrast, 0, [](Options& o, int v) { o.contrast = v; });
+    menu->addSeparator();
+    QAction* colour = menu->addAction(tr("Coloured waterfall"));
+    colour->setCheckable(true);
+    colour->setChecked(m_opt.colour);
+    connect(colour, &QAction::triggered, this, [this](bool on) {
+        Options o = m_opt;
+        o.colour = on;
+        setOptions(o);
+    });
+    QAction* trace = menu->addAction(tr("Spectrum line above the waterfall"));
+    trace->setCheckable(true);
+    trace->setChecked(m_opt.trace);
+    connect(trace, &QAction::triggered, this, [this](bool on) {
+        Options o = m_opt;
+        o.trace = on;
+        // Fuer Linie UND Wasserfall reicht die kleine Hoehe nicht.
+        if (on && o.height == 0) { o.height = 1; }
+        setOptions(o);
+    });
+    return menu;
+}
+
+QRect KiwiOwnSignalStrip::traceRect() const
+{
+    if (!m_opt.trace) { return {}; }
+    const QRect b = bodyRect();
+    return QRect(b.left(), b.top(), b.width(), b.height() * 45 / 100);
+}
+
+QRect KiwiOwnSignalStrip::waterfallRect() const
+{
+    QRect b = bodyRect();
+    if (m_opt.trace) { b.setTop(traceRect().bottom() + 1); }
+    return b;
+}
+
+// Die neuesten Zeilen als Linie: so sieht man Pegel und Breite des eigenen
+// Signals. Warm, weil gemessen.
+void KiwiOwnSignalStrip::paintTrace(QPainter& p, const QRect& r) const
+{
+    p.fillRect(r, QColor(Style::kInsetBg));
+    if (m_rows.isEmpty() || r.width() <= 1 || r.height() <= 4
+        || m_bandwidthHz <= 0.0) {
+        return;
+    }
+    const double bottomDbm = noiseFloorDbm() - 8.0;
+    constexpr double kRangeDb = 60.0;
+    const double lo = m_centerHz - m_bandwidthHz / 2.0;
+    const int rows = std::min<int>(3, m_rows.size());   // leicht geglaettet
+    QPainterPath path;
+    bool first = true;
+    for (int x = 0; x < r.width(); ++x) {
+        const double f = lo + (x + 0.5) / r.width() * m_bandwidthHz;
+        double sum = 0.0;
+        int n = 0;
+        for (int i = 0; i < rows; ++i) {
+            const Row& row = m_rows[i];
+            if (f < row.lowHz || f > row.highHz) { continue; }
+            const int bins = row.bins.size();
+            const int bi = std::clamp(
+                int((f - row.lowHz) / (row.highHz - row.lowHz) * bins), 0, bins - 1);
+            sum += row.bins[bi];
+            ++n;
+        }
+        if (n == 0) { first = true; continue; }
+        const double t = std::clamp((sum / n - bottomDbm) / kRangeDb, 0.0, 1.0);
+        const QPointF q(r.left() + x, r.bottom() - 1 - t * (r.height() - 3));
+        if (first) { path.moveTo(q); first = false; } else { path.lineTo(q); }
+    }
+    p.save();
+    p.setClipRect(r);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    // Alle 10 dB eine feine Linie.
+    p.setPen(QPen(border(), 1));
+    for (double d = 10.0; d < kRangeDb; d += 10.0) {
+        const int y = r.bottom() - 1 - int(d / kRangeDb * (r.height() - 3));
+        p.drawLine(r.left(), y, r.right(), y);
+    }
+    p.setPen(QPen(warm(), 1.4));
+    p.drawPath(path);
+    p.restore();
 }
 
 void KiwiOwnSignalStrip::setKiwiName(const QString& name)
@@ -277,9 +488,10 @@ void KiwiOwnSignalStrip::renderBody(QImage& img) const
     img.fill(QColor(Style::kInsetBg));
     if (m_rows.isEmpty() || W <= 0 || H <= 0 || m_bandwidthHz <= 0.0) { return; }
 
-    // Grau-Rampe: Rauschen ein dunkles Grau, +35 dB ueber dem Rauschen weiss.
-    const double floorDbm = noiseFloorDbm() - 4.0;
-    constexpr double kSpanDb = 39.0;
+    // Rampe ueber dem Rauschen; Lage (Helligkeit) und Spanne (Kontrast)
+    // aus dem Zahnrad. Vorgabe: Rauschen dunkel, +35 dB darueber weiss.
+    const double floorDbm = noiseFloorDbm() + kFloorOffsetDb[m_opt.brightness];
+    const double spanDb = kSpanDbByContrast[m_opt.contrast];
     const double lo = m_centerHz - m_bandwidthHz / 2.0;
 
     for (int y = 0; y < H; ++y) {
@@ -296,9 +508,9 @@ void KiwiOwnSignalStrip::renderBody(QImage& img) const
             const int bi = std::clamp(
                 int((f - r.lowHz) / (r.highHz - r.lowHz) * N), 0, N - 1);
             const double t = std::clamp(
-                (double(r.bins[bi]) - floorDbm) / kSpanDb, 0.0, 1.0);
+                (double(r.bins[bi]) - floorDbm) / spanDb, 0.0, 1.0);
             const int g = 18 + int(t * 237.0);
-            line[x] = qRgb(g, g, g);
+            line[x] = m_opt.colour ? colourFor(t) : qRgb(g, g, g);
         }
     }
 }
@@ -324,17 +536,20 @@ QImage KiwiOwnSignalStrip::waterfallImage(int width) const
 
 int KiwiOwnSignalStrip::buttonsWidth() const
 {
-    return m_soundButton->sizeHint().width() + 2 * 22 + 3 * 4 + 8;
+    return m_soundButton->sizeHint().width() + 3 * 22 + 4 * 4 + 8;
 }
 
 void KiwiOwnSignalStrip::layoutButtons()
 {
     const int y = (kHeaderH - 2 - 18) / 2;
     int x = width() - m_marginRight - 8;
-    x -= m_zoomIn->width();   m_zoomIn->move(x, y);
+    x -= m_gear->width();     m_gear->move(x, y);
+    x -= 4 + m_zoomIn->width();   m_zoomIn->move(x, y);
     x -= 4 + m_zoomOut->width(); m_zoomOut->move(x, y);
+    // Auch die Breite setzen: sonst behielt der Knopf die Vorgabe und lag
+    // ueber den Zoomknoepfen.
     x -= 4 + m_soundButton->sizeHint().width();
-    m_soundButton->move(x, y);
+    m_soundButton->setGeometry(x, y, m_soundButton->sizeHint().width(), 18);
 }
 
 void KiwiOwnSignalStrip::resizeEvent(QResizeEvent* e)
@@ -385,9 +600,11 @@ void KiwiOwnSignalStrip::paintEvent(QPaintEvent*)
 
     // ── Wasserfall ─────────────────────────────────────────────────────
     if (body.width() > 0 && body.height() > 0) {
-        QImage img(body.size(), QImage::Format_RGB32);
+        const QRect wf = waterfallRect();
+        if (m_opt.trace) { paintTrace(p, traceRect()); }
+        QImage img(wf.size(), QImage::Format_RGB32);
         renderBody(img);
-        p.drawImage(body.topLeft(), img);
+        p.drawImage(wf.topLeft(), img);
         if (m_rows.isEmpty()) {
             p.setFont(Style::monoFont(font(), 11, QFont::Normal));
             p.setPen(scale());
