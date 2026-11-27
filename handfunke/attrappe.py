@@ -80,6 +80,8 @@ EINGETRAGEN = []
 # --rotorfrei schaltet das Drehen frei; ohne das wird abgelehnt, genau wie
 # TciAllowRemoteRotor ab Werk.
 ROTOR_FREI = '--rotorfrei' in sys.argv
+# --alte-peilung: rotor_peilung ohne <quelle>, wie Longpath vor 2026-11-27.
+ALTE_PEILUNG = '--alte-peilung' in sys.argv
 # Zustand als NAME, wie `rotor_ist:` ihn seit dem 2026-10-07 sendet.
 ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 'bereit', 'frisch': True}
 # --rotorstand N: Anfangsstellung des Rotors (fuer Entwurfsblaetter; 143 liegt
@@ -504,6 +506,7 @@ class Verbindung(threading.Thread):
             # kennt nur eine Handvoll Prefixe -- genug fuer die FT8-Funde oben.
             ruf = (args[0].strip().upper() if args else '')
             # Seit 2026-11-27 auch ein Locator: dann genau dieser Ort.
+            # --alte-peilung: wie Longpath vor 2026-11-27 (kein 8. Feld).
             loc = _locator_lage(ruf)
             ziel = (loc + ('',)) if loc else next((v for k, v in PREFIX_LAGE if ruf.startswith(k)), None)
             if not ruf or ziel is None:
@@ -514,8 +517,9 @@ class Verbindung(threading.Thread):
                 # Drehbereich wie bei Martin: nur die Westhaelfte 180..360.
                 frei = lambda g: 1 if g >= 180 else 0
                 self.sende_text(f'rotor_peilung:{ruf},{grad:.1f},{km:.0f},{ziel[2]},'
-                                f'{lang:.1f},{frei(grad)},{frei(lang)},'
-                                f'{"locator" if loc else "land"};')
+                                f'{lang:.1f},{frei(grad)},{frei(lang)}'
+                                + ('' if ALTE_PEILUNG else f',{"locator" if loc else "land"}')
+                                + ';')
             print(f'  {self.addr[1]}: {zeile}')
         elif name == 'spots':
             # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe

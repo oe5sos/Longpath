@@ -17,7 +17,7 @@ import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
 import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassRund } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
-         peilungAus, peilungLesen, rufEingabe, Sicherung as RotorSicherung,
+         peilungAus, peilungLesen, rufEingabe, istLocator, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2236,6 +2236,7 @@ function peilungFragen(ruf) {
 }
 function peilungAnwenden(p) {
   if (!rotorFeldAn) { return; }
+  if (istLocator(p.ruf) && p.quelle !== 'locator') { return; }   // altes Longpath
   if (!ft8MarkiertIst(p.ruf) && p.ruf !== rotorRufGefragt) { return; }
   // Vorgewaehlt wird der Weg, den der Drehbereich erlaubt -- bei Martin ist
   // der Osten zu (Berg), nach Japan geht es nur ueber den langen Weg.
@@ -2293,6 +2294,11 @@ function rotorPeilZeichnen() {
     html = `<span class="pText"><b>${ruf}</b><i>${link.ready ? 'Peilung wird gefragt …' : 'keine Verbindung'}</i></span>`;
   } else if (p.fehler) {
     html = `<span class="pText"><b>${ruf}</b><i>keine Peilung — ${p.fehler}</i></span>`;
+  } else if (istLocator(ruf) && p.quelle !== 'locator') {
+    // Ein Longpath vor 2026-11-27 kennt keine Locator und peilt "PM95" wie
+    // ein Rufzeichen ueber cty.dat -- eine Zahl, die nach etwas aussieht und
+    // falsch ist. Dann lieber keine Knoepfe.
+    html = `<span class="pText"><b>${ruf}</b><i>Locator kennt erst ein neueres Longpath</i></span>`;
   } else {
     // Oben WAS gepeilt wurde, darunter wie weit und wie genau. Das Rufzeichen
     // steht schon im Feld; die Tausender mit Punkt wie ueberall hier.
