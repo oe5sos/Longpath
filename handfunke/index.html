@@ -177,11 +177,8 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 </div>
 <div class="schicht instr" id="kompassBox" aria-label="Rotor, antippen oeffnet die Steuerung" hidden>
   <div class="kopf"><span class="caps">Rotor</span><span class="chipw aus" id="rotorGradK">—</span></div>
-  <svg class="ring" id="rotorKlein" viewBox="-115 -115 230 230" aria-hidden="true">
-    <g id="rotorBlattK"></g>
-    <line class="nd" id="rotorNadelK" x1="0" y1="0" x2="0" y2="-82"/>
-    <circle class="nb" cx="0" cy="0" r="6"/>
-  </svg>
+  <!-- Zifferblatt baut instrument.js kompassRund(), wie das S-Meter. -->
+  <svg class="ring" id="rotorKlein" viewBox="-118 -118 236 236" aria-hidden="true"></svg>
 </div>
 </div>
 

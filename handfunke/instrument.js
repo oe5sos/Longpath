@@ -94,19 +94,54 @@ export function zeiger(svg, cfg, kennung) {
   };
 }
 
-/** Kompass-Zifferblatt nach RotatorItem: Punkte alle 10 Grad, grosse alle 45. */
-export function kompassBlatt(g) {
-  g.replaceChildren();
-  const r = 78, rt = 100, h = 220;   // Halbmesser 0,8 h/2 beim Mac, hier im 220er Mass
+/**
+ * Kleiner Rotor-Kompass fuer die Instrumentenzeile, in der Sprache des
+ * S-Meters (Entwurf A vom 2026-11-26): dieselbe Rille mit Schatten, Teilung
+ * aussen innen angesetzt, Bernstein-Glut, Zeiger mit heller Kante, Nabe.
+ * Baut das ganze svg; gibt update(grad|null, alt) zurueck.
+ */
+export function kompassRund(svg, kennung) {
+  const KR = 92, KW = 12;
+  svg.setAttribute('viewBox', '-118 -118 236 236');
+  svg.replaceChildren();
+  const pt = (r, d) => { const a = (d - 90) * Math.PI / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
+  const linie = (p1, p2, a) => el('line', { x1: p1[0].toFixed(1), y1: p1[1].toFixed(1), x2: p2[0].toFixed(1), y2: p2[1].toFixed(1), ...a });
+  const defs = el('defs', {}); svg.appendChild(defs);
+  const gg = el('radialGradient', { id: kennung + 'glow', cx: 0, cy: 0, r: KR * 0.9, gradientUnits: 'userSpaceOnUse' });
+  gg.appendChild(el('stop', { offset: '0', 'stop-color': C.meas, 'stop-opacity': '.14' }));
+  gg.appendChild(el('stop', { offset: '0.6', 'stop-color': C.meas, 'stop-opacity': '.04' }));
+  gg.appendChild(el('stop', { offset: '1', 'stop-color': C.meas, 'stop-opacity': '0' })); defs.appendChild(gg);
+  const glow = el('circle', { cx: 0, cy: 0, r: KR - KW / 2 - 2, fill: `url(#${kennung}glow)` }); svg.appendChild(glow);
+  svg.appendChild(el('circle', { cx: 0, cy: 0, r: KR, fill: 'none', stroke: C.inset, 'stroke-width': KW }));
+  svg.appendChild(el('circle', { cx: 0, cy: 0, r: KR + KW / 2 - 1.1, fill: 'none', stroke: '#000', 'stroke-width': 2.2, opacity: '.75' }));
+  svg.appendChild(el('circle', { cx: 0, cy: 0, r: KR, fill: 'none', stroke: C.arc, 'stroke-width': 1 }));
   for (let d = 0; d < 360; d += 10) {
-    const a = (d - 90) * Math.PI / 180, gross = d % 45 === 0;
-    g.appendChild(el('circle', { cx: (r * Math.cos(a)).toFixed(1), cy: (r * Math.sin(a)).toFixed(1),
-      r: gross ? 4.2 : 1.8, fill: gross ? (d === 0 ? C.danger : '#909096') : '#58585e' }));
+    const gross = d % 90 === 0, mittel = d % 30 === 0;
+    svg.appendChild(linie(pt(KR - KW / 2 - 1, d), pt(KR - KW / 2 - (gross ? 12 : mittel ? 8 : 5), d),
+      { stroke: C.face, 'stroke-width': gross ? 2.2 : 1.2, opacity: gross || mittel ? '1' : '.55' }));
   }
-  for (const [t, d] of [['N', 0], ['E', 90], ['S', 180], ['W', 270]]) {
-    const a = (d - 90) * Math.PI / 180;
-    const x = el('text', { x: (rt * Math.cos(a)).toFixed(1), y: (rt * Math.sin(a) + 7).toFixed(1), fill: d === 0 ? C.danger : '#909096',
-      'font-size': 21, 'font-weight': d === 0 ? 700 : 500, 'font-family': 'ui-monospace, Menlo, monospace', 'text-anchor': 'middle' });
-    x.textContent = t; g.appendChild(x);
+  for (const [t, d] of [['N', 0], ['O', 90], ['S', 180], ['W', 270]]) {
+    const p = pt(KR - KW / 2 - 30, d);
+    const x = el('text', { x: p[0].toFixed(1), y: (p[1] + 11).toFixed(1), 'text-anchor': 'middle' });
+    // Inline, weil .ring text{} in stil.css die Attribute ueberstimmt.
+    x.setAttribute('style', 'fill:#909096;font:600 32px ui-monospace,Menlo,monospace');
+    x.textContent = t; svg.appendChild(x);
   }
+  const edge = el('line', { stroke: C.meas, 'stroke-width': 1.8, opacity: '.75' });
+  const needle = el('line', { stroke: C.meas, 'stroke-width': 3.6, 'stroke-linecap': 'round', x1: 0, y1: 0 });
+  svg.appendChild(edge); svg.appendChild(needle);
+  svg.appendChild(el('circle', { cx: 0, cy: 0, r: 7, fill: '#15151a', stroke: C.dim, 'stroke-width': 1.4 }));
+  return (grad, alt) => {
+    if (grad === null || grad === undefined || isNaN(grad)) {
+      needle.setAttribute('visibility', 'hidden'); edge.setAttribute('visibility', 'hidden');
+      glow.setAttribute('opacity', '.55'); return;
+    }
+    needle.removeAttribute('visibility'); edge.removeAttribute('visibility');
+    const col = alt ? C.dim : C.meas;                       // veralteter Stand: gedaempft
+    glow.setAttribute('opacity', alt ? '.55' : '1');
+    const n1 = pt(KR - KW / 2 - 3, grad), e0 = pt(18, grad);
+    needle.setAttribute('x2', n1[0].toFixed(1)); needle.setAttribute('y2', n1[1].toFixed(1)); needle.setAttribute('stroke', col);
+    edge.setAttribute('x1', e0[0].toFixed(1)); edge.setAttribute('y1', e0[1].toFixed(1));
+    edge.setAttribute('x2', n1[0].toFixed(1)); edge.setAttribute('y2', n1[1].toFixed(1)); edge.setAttribute('stroke', col);
+  };
 }
