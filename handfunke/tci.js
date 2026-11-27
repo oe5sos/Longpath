@@ -75,6 +75,7 @@ export class TciLink extends EventTarget {
       mox: false, tune: false, split: false,
       // RIT/XIT je Empfaenger; null = noch nicht gemeldet (Init-Burst
       // schickt sie, TciProtocol buildRitEnableLine & Co.).
+      lock: [null, null],
       rit: [null, null], ritHz: [null, null],
       xit: [null, null], xitHz: [null, null],
       // Aufbereitung und AGC je Empfaenger, ebenfalls nur vom Server
@@ -306,6 +307,10 @@ export class TciLink extends EventTarget {
       case 'trx':   s.mox   = bool(1); break;
       case 'tune':  s.tune  = bool(1); break;
       case 'split_enable': s.split = bool(1); break;
+      // VFO-Sperre: dieselbe wie LOCK am Mac (SliceModel::locked). Longpath
+      // meldet `lock:rx,bool;` und zusaetzlich `vfo_lock:rx,ch,bool;`.
+      case 'lock':        { const t = int(0); if (t !== null && t < 2) s.lock[t] = bool(1); break; }
+      case 'vfo_lock':    { const t = int(0); if (t !== null && t < 2) s.lock[t] = bool(2); break; }
       case 'rit_enable':  { const t = int(0); if (t !== null && t < 2) s.rit[t]   = bool(1); break; }
       case 'xit_enable':  { const t = int(0); if (t !== null && t < 2) s.xit[t]   = bool(1); break; }
       case 'rit_offset':  { const t = int(0); if (t !== null && t < 2) s.ritHz[t] = int(1); break; }
