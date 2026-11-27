@@ -64,12 +64,15 @@ constexpr const char* kKeyKm = "KiwiOwnSignal/Km";
 // Durchlass des Kiwi in "Mein Signal" bei SSB (Hoerfrequenz).
 constexpr int kKiwiOwnSignalLowHz = 50;
 constexpr int kKiwiOwnSignalHighHz = 4000;
-// Nachhoeren: Laufzeit, wenn keine gemessen ist; Zugabe nach dem Loslassen;
-// Takt und Vorlauf beim Abspielen.
-constexpr int kReplayDefaultDelayMs = 2000;
+// Nachhoeren: Laufzeit, wenn keine gemessen ist (grosszuegig, sonst fehlt
+// der Schluss); Zugabe nach dem Loslassen; Takt, Vorlauf und groesstes Stueck
+// beim Abspielen. Der Ausgabepuffer fasst 100 ms -- mehr auf einmal ging
+// verloren.
+constexpr int kReplayDefaultDelayMs = 4000;
 constexpr int kReplayTailExtraMs = 700;
-constexpr int kReplayTickMs = 50;
-constexpr int kReplayLeadMs = 300;
+constexpr int kReplayTickMs = 20;
+constexpr int kReplayLeadMs = 60;
+constexpr int kReplayMaxChunkMs = 60;
 constexpr const char* kKeyReplay = "KiwiOwnSignal/Replay";
 // Der Kiwi zeigt nie weniger als dies (er hat nur ganzzahlige Zoomstufen
 // und sein Bild wird ab etwa 10 kHz Breite unbrauchbar eng).
@@ -642,7 +645,8 @@ void MainWindow::feedKiwiReplayChunk()
     const int due = int(m_kiwiReplayClock.elapsed()) + kReplayLeadMs
                     - m_kiwiReplayFedMs;
     if (due <= 0) { return; }
-    const QByteArray part = m_kiwiReplay.nextChunk(due);
+    const QByteArray part =
+        m_kiwiReplay.nextChunk(std::min(due, kReplayMaxChunkMs));
     m_kiwiReplayFedMs += int(part.size() / KiwiReplayBuffer::kBytesPerMs);
     const int db = kiwiVolumeDb(m_kiwiOwnProfileId);
     audio->feedKiwiSdrAudioData(

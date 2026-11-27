@@ -20,6 +20,7 @@
 
 #include "core/KiwiSdrManager.h"
 #include "gui/MainWindow.h"
+#include "gui/KiwiWaterfallPanel.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
 
@@ -161,6 +162,46 @@ private slots:
         QCOMPARE(mgr->assignedSliceForProfile(a), sliceA);
         QVERIFY(mgr->assignedSliceForProfile(b) >= 0);
         QVERIFY(mgr->assignedSliceForProfile(b) != sliceA);
+        clearProfiles(mgr);
+    }
+
+    // 2026-11-27, Betreiber: "kiwis gehen mit X nicht zu".
+    void dasXAmStreifenSchliesstDenKiwi()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        QVERIFY(mgr);
+        clearProfiles(mgr);
+        KiwiWaterfallPanel* panel = mw->kiwiWaterfallPanelForTest();
+        QVERIFY(panel);
+
+        // Nur "Ton an": die Vorschau war nie eingeschaltet.
+        const QString a = mgr->addProfile(QStringLiteral("Ton"),
+                                          QStringLiteral("kiwi-c.example.at:8073"));
+        mw->setKiwiSoundForTest(a, true);
+        QVERIFY(panel->stripForTest(a));
+        QVERIFY(mgr->assignedSliceForProfile(a) >= 0);
+        emit panel->removeRequested(a);
+        QVERIFY2(!panel->stripForTest(a), "der Streifen ist weg");
+        QCOMPARE(mgr->assignedSliceForProfile(a), -1);
+
+        // Der Kiwi von "Mein Signal": der Modus geht mit aus, und der
+        // Sekundentakt holt den Streifen nicht zurueck.
+        const QString b = mgr->addProfile(QStringLiteral("Mein"),
+                                          QStringLiteral("kiwi-d.example.at:8073"));
+        mw->setKiwiOwnSignalProfileForTest(b, 38.0);
+        mw->setKiwiOwnSignalForTest(true);
+        QVERIFY(mw->kiwiOwnSignalOnForTest());
+        QTRY_VERIFY_WITH_TIMEOUT(panel->stripForTest(b), 4000);
+        emit panel->removeRequested(b);
+        QVERIFY(!mw->kiwiOwnSignalOnForTest());
+        QTest::qWait(1500);
+        QVERIFY(!panel->stripForTest(b));
+        QCOMPARE(mgr->assignedSliceForProfile(b), -1);
         clearProfiles(mgr);
     }
 

@@ -609,6 +609,43 @@ QString MainWindow::kiwiLostTitle(const QString& profileId) const
     return QString();
 }
 
+// Das X heisst schliessen (Betreiber 2026-11-27: "kiwis gehen mit X nicht
+// zu"). Vorher schaltete es nur die Wasserfall-Vorschau ab: war die nie an
+// (nur "Ton an"), geschah nichts; sonst blieben Ton und Verbindung, und bei
+// "Mein Signal" holte der Sekundentakt den Streifen zurueck.
+void MainWindow::closeKiwi(const QString& profileId)
+{
+    if (!m_kiwiSdrManager || !m_radioModel || profileId.isEmpty()) { return; }
+    // Kopie: der Aufrufer reicht die Kennung aus dem Streifen, der gleich geht.
+    const QString id = profileId;
+    if (m_kiwiOwnSignalOn && id == m_kiwiOwnProfileId) { setKiwiOwnSignal(false); }
+    if (m_kiwiGroup.contains(id)) { removeKiwiListener(id); }
+    const int sliceId = m_kiwiSdrManager->assignedSliceForProfile(id);
+    if (sliceId >= 0) {
+        if (AudioEngine* audio = m_radioModel->audioEngine()) {
+            audio->removeKiwiSdrAudioSource(sliceId);
+        }
+        m_kiwiSdrManager->clearSliceAssignment(sliceId);
+        // Nur die fuer seinen Ton angelegte Scheibe wieder wegraeumen.
+        if (m_kiwiSoundSlices.value(id, -1) == sliceId) {
+            if (SliceModel* s = m_radioModel->sliceById(sliceId)) {
+                s->setSuppressAutoStreamBinding(false);
+            }
+            m_radioModel->removeSlice(sliceId);
+        }
+    }
+    m_kiwiSoundSlices.remove(id);
+    m_kiwiUserMuted.remove(id);
+    m_kiwiSdrManager->setWaterfallPreviewEnabled(id, false);
+    m_kiwiSdrManager->disconnectProfile(id);
+    // Auch wenn die Vorschau schon aus war und darum kein Signal kam.
+    if (m_kiwiWaterfallPanel) {
+        m_kiwiWaterfallPanel->setStripEnabled(id, false, QString());
+    }
+    refreshKiwiSoundButtons();
+    refreshKiwiHearingDialog();
+}
+
 void MainWindow::retireKiwi(const QString& profileId)
 {
     if (!m_kiwiSdrManager || profileId == m_kiwiOwnProfileId

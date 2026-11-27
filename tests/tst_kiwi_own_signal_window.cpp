@@ -165,8 +165,11 @@ private slots:
         mw->kiwiOwnSignalTxEdgeForTest(false);
         QVERIFY(mw->kiwiReplayForTest().isRecording());   // Nachlauf
 
-        QTRY_VERIFY_WITH_TIMEOUT(mw->kiwiReplayForTest().isPlaying(), 6000);
+        QTRY_VERIFY_WITH_TIMEOUT(mw->kiwiReplayForTest().isPlaying(), 8000);
         QVERIFY(mw->radioMutedForTest());
+        // Nicht auf einmal: der Ausgabepuffer fasst 100 ms.
+        QVERIFY2(mw->kiwiReplayForTest().durationMs() >= 900,
+                 "beim Start darf nur ein kleines Stueck abgehen");
         QTRY_VERIFY_WITH_TIMEOUT(!mw->kiwiReplayForTest().isPlaying(), 6000);
         QVERIFY(!mw->radioMutedForTest());
         knopf->setChecked(false);

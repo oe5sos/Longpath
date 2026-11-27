@@ -1705,6 +1705,8 @@ private:
     void syncKiwiOwnSignal();
     bool sendKiwiOwnSignalTracking();
     void kiwiOwnSignalTxEdge(bool sending);
+    // Das X an einem Wasserfall-Streifen: diesen Kiwi ganz schliessen.
+    void closeKiwi(const QString& profileId);
     // Nachhoeren: Kiwi waehrend der Sendung still mitschneiden, danach abspielen.
     void setKiwiReplay(bool on);
     void kiwiReplayTxEdge(bool sending, int delayMs, bool delayMeasured);

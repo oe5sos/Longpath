@@ -909,7 +909,7 @@ void MainWindow::wireKiwiSdr()
     if (m_kiwiWaterfallPanel) {
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::removeRequested, this,
                 [this](const QString& id) {
-            if (m_kiwiSdrManager) { m_kiwiSdrManager->setWaterfallPreviewEnabled(id, false); }
+            closeKiwi(id);
         });
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::renameRequested, this,
                 [this](const QString& id) {
