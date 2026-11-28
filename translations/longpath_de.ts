@@ -3620,6 +3620,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation>Getrennt – Server-Limit</translation>
     </message>
     <message>
+        <source>Receiver full – waiting for a free place</source>
+        <translation>Empfänger voll – wartet auf freien Platz</translation>
+    </message>
+    <message>
         <source>Disconnected – receiver full</source>
         <translation>Getrennt – Empfänger voll</translation>
     </message>

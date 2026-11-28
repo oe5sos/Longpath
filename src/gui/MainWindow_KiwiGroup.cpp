@@ -648,9 +648,11 @@ QString MainWindow::kiwiLostTitle(const QString& profileId) const
     case KiwiSdrClient::State::Disconnected:
     case KiwiSdrClient::State::CampDisconnected:
         return tr("Disconnected");
+    case KiwiSdrClient::State::Waiting:
+        // Kein Platz frei: ohne diese Zeile blieb der Streifen leer.
+        return tr("Receiver full – waiting for a free place");
     case KiwiSdrClient::State::Connecting:
     case KiwiSdrClient::State::Connected:
-    case KiwiSdrClient::State::Waiting:
     case KiwiSdrClient::State::Camping:
         break;
     }

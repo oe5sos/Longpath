@@ -29,6 +29,8 @@
 #include "core/KiwiReplayBuffer.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/MainWindow.h"
+#include "gui/KiwiWaterfallStripWidget.h"
+#include "gui/KiwiWaterfallPanel.h"
 #include "gui/widgets/KiwiLostOverlay.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
@@ -254,6 +256,40 @@ private slots:
         mgr->setWaterfallAvailableForTest(a, true);
         QVERIFY(overlay->isHidden());
         QCOMPARE(strip->bodyText(), waiting);
+        mw->setKiwiOwnSignalForTest(false);
+        clearProfiles(mgr);
+    }
+
+    // 2026-11-28 an Martins Station: f4kiy mit 8 von 8 Plaetzen belegt --
+    // beide Streifen blieben ohne ein Wort leer.
+    void einVollerKiwiSagtDassErWartet()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        const QString a = mgr->addProfile(QStringLiteral("Belegt"),
+                                          QStringLiteral("kiwi-b.example.at:8073"));
+        mw->setKiwiOwnSignalProfileForTest(a);
+        mw->setKiwiOwnSignalForTest(true);
+        mgr->setStateForTest(a, KiwiSdrClient::State::Waiting);
+
+        QWidget* own = mw->kiwiOwnStripForTest()->lostOverlayForTest();
+        QVERIFY(!own->isHidden());
+        auto* title = own->findChild<QLabel*>(QStringLiteral("kiwiLostTitle"));
+        QVERIFY(title);
+        QVERIFY2(title->text().contains(QStringLiteral("full")),
+                 qPrintable(title->text()));
+        auto* inWindow = mw->kiwiWaterfallPanelForTest()->stripForTest(a);
+        QVERIFY(inWindow);
+        QVERIFY(!inWindow->lostOverlayForTest()->isHidden());
+
+        mgr->setStateForTest(a, KiwiSdrClient::State::Connected);
+        QVERIFY(own->isHidden());
+        QVERIFY(inWindow->lostOverlayForTest()->isHidden());
         mw->setKiwiOwnSignalForTest(false);
         clearProfiles(mgr);
     }
