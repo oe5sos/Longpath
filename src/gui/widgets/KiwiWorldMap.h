@@ -20,6 +20,8 @@
 #include <QVector>
 #include <QWidget>
 
+class QToolButton;
+
 namespace Longpath {
 
 struct KiwiMapPoint {
@@ -62,6 +64,11 @@ public:
     // Naechster Punkt innerhalb von 9 px, sonst -1.
     int pointAt(const QPointF& pos) const;
     QString idAt(const QPointF& pos) const;
+    // Vergroessern (+1) und verkleinern (-1); 1.0 = der Grundausschnitt
+    // (Welt oder setAutoFit). Mit der Maus ziehen verschiebt.
+    void zoomStep(int direction);
+    double zoom() const { return m_zoom; }
+
     // Sichtbarer Ausschnitt in Grad.
     void viewBounds(double& lat0, double& lat1, double& lon0, double& lon1) const;
 
@@ -76,10 +83,30 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     void leaveEvent(QEvent* event) override;
 
 private:
     void computeView(double& lat0, double& lat1, double& lon0, double& lon1) const;
+    void baseView(double& lat0, double& lat1, double& lon0, double& lon1) const;
+    // Neuer Faktor; der Ort unter anchor bleibt stehen.
+    void zoomAt(double factor, const QPointF& anchor);
+    void updateZoomButtons();
+
+    static constexpr double kZoomStep = 1.7;
+    static constexpr double kMaxZoom = 120.0;
+    double m_zoom{1.0};
+    double m_centerLat{0.0};       // gilt nur bei m_zoom > 1
+    double m_centerLon{0.0};
+    QToolButton* m_zoomInButton{nullptr};
+    QToolButton* m_zoomOutButton{nullptr};
+    QPointF m_pressPos;
+    QPointF m_dragLast;
+    bool m_pressed{false};
+    bool m_dragged{false};
 
     QVector<KiwiMapPoint> m_points;
     bool m_homeValid{false};

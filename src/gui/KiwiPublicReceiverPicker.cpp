@@ -69,7 +69,7 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
 {
     resize(900, 720);
 
-    setWindowTitle(tr("Oeffentliche KiwiSDR-Empfaenger"));
+    setWindowTitle(tr("Public KiwiSDR receivers"));
 
     auto* outer = new QVBoxLayout(this);
 
@@ -133,6 +133,7 @@ KiwiPublicReceiverPicker::KiwiPublicReceiverPicker(QWidget* parent)
     m_ok = buttons->button(QDialogButtonBox::Ok);
     m_ok->setText(tr("Add selected"));
     m_ok->setEnabled(false);
+    buttons->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
     outer->addWidget(buttons);
 
     connect(buttons, &QDialogButtonBox::accepted, this, &KiwiPublicReceiverPicker::acceptCurrentRow);
@@ -339,9 +340,13 @@ void KiwiPublicReceiverPicker::applyFilter()
     if (!hiddenParts.isEmpty())
         status += tr(" (%1 hidden)").arg(hiddenParts.join(QStringLiteral(", ")));
     if (m_preselect) {
-        status += tr("  ·  sorted by distance from %1, fitting %2 MHz")
-                      .arg(m_ownGrid.isEmpty() ? tr("(locator missing)") : m_ownGrid)
-                      .arg(m_frequencyHz / 1.0e6, 0, 'f', 3);
+        const QString grid = m_ownGrid.isEmpty() ? tr("(locator missing)") : m_ownGrid;
+        // Ohne Frequenz (kein Funkgeraet) nicht "passend zu 0.000 MHz".
+        status += m_frequencyHz > 0.0
+            ? tr("  ·  sorted by distance from %1, fitting %2 MHz")
+                  .arg(grid)
+                  .arg(m_frequencyHz / 1.0e6, 0, 'f', 3)
+            : tr("  ·  sorted by distance from %1").arg(grid);
     }
     if (m_fromCache)
         status += tr("  ·  cached — use “Refresh list” to update");

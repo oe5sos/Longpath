@@ -9,8 +9,12 @@
 #include <QPolygonF>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QMouseEvent>
+#include <QSignalSpy>
+#include <QToolButton>
 
 #include "gui/KiwiPublicReceiverPicker.h"
+#include "gui/widgets/KiwiWorldBorders.h"
 #include "gui/widgets/KiwiWorldCoast.h"
 #include "gui/widgets/KiwiWorldMap.h"
 
@@ -83,6 +87,105 @@ private slots:
         QTest::mouseClick(&map, Qt::LeftButton, {}, map.toWidget(48.3, 14.3).toPoint());
         QCOMPARE(spy.count(), 1);
         QCOMPARE(spy.at(0).at(0).toString(), QStringLiteral("a"));
+    }
+
+    // 2026-11-28, Betreiber: "mit plus und minus vergroessern koennen, so
+    // dass man die Kiwis genau erkennen kann".
+    void plusUndMinusVergroessern()
+    {
+        KiwiWorldMap map;
+        map.resize(900, 420);
+        KiwiMapPoint a;
+        a.id = QStringLiteral("a");
+        a.name = QStringLiteral("Wels eins");
+        a.lat = 48.16;
+        a.lon = 14.02;
+        KiwiMapPoint b = a;
+        b.id = QStringLiteral("b");
+        b.name = QStringLiteral("Wels zwei");
+        b.lat = 48.24;
+        b.lon = 14.22;
+        map.setPoints({a, b});
+        map.setHome(47.9, 13.8, true, QStringLiteral("JN67VV"));
+        map.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&map, 15000));
+        auto* plus = map.findChild<QToolButton*>(QStringLiteral("kiwiMapZoomIn"));
+        auto* minus = map.findChild<QToolButton*>(QStringLiteral("kiwiMapZoomOut"));
+        QVERIFY(plus && minus);
+        QVERIFY(plus->isVisible() && minus->isVisible());
+        QVERIFY(!minus->isEnabled());            // die ganze Welt: kleiner geht nicht
+
+        auto gap = [&map, &a, &b]() {
+            return QLineF(map.toWidget(a.lat, a.lon), map.toWidget(b.lat, b.lon)).length();
+        };
+        const double world = gap();
+        QVERIFY(world < 9.0);                    // ein Fleck
+        for (int i = 0; i < 8; ++i) { QTest::mouseClick(plus, Qt::LeftButton); }
+        QVERIFY2(gap() > 18.0, qPrintable(QString::number(gap())));
+        QCOMPARE(map.idAt(map.toWidget(a.lat, a.lon)), QStringLiteral("a"));
+        QCOMPARE(map.idAt(map.toWidget(b.lat, b.lon)), QStringLiteral("b"));
+        // Vergroessert wird um den eigenen Standort.
+        const QPointF home = map.toWidget(47.9, 13.8);
+        QVERIFY(QLineF(home, QPointF(450, 210)).length() < 2.0);
+
+        // Ziehen verschiebt und waehlt nichts aus.
+        QSignalSpy clicked(&map, &KiwiWorldMap::pointClicked);
+        const QPointF from = map.toWidget(a.lat, a.lon);
+        const QPointF to = from + QPointF(60, 40);
+        QTest::mousePress(&map, Qt::LeftButton, {}, from.toPoint());
+        QMouseEvent move(QEvent::MouseMove, to, map.mapToGlobal(to), Qt::NoButton,
+                         Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&map, &move);
+        QTest::mouseRelease(&map, Qt::LeftButton, {}, to.toPoint());
+        QVERIFY2(QLineF(map.toWidget(a.lat, a.lon), to).length() < 2.0,
+                 "die Karte ging nicht mit");
+        QCOMPARE(clicked.count(), 0);
+
+        // Minus fuehrt zurueck zur ganzen Welt.
+        for (int i = 0; i < 20 && minus->isEnabled(); ++i) {
+            QTest::mouseClick(minus, Qt::LeftButton);
+        }
+        QVERIFY(!minus->isEnabled());
+        QCOMPARE(gap(), world);
+    }
+
+    // 2026-11-28, Betreiber: "die Umrisse der Laender sollte man schon sehen".
+    void laenderumrisseSindZuSehen()
+    {
+        QVERIFY(kiwiBorderRingCount() > 200);
+        KiwiWorldMap map;
+        map.resize(900, 420);
+        map.setHome(47.9, 13.8, true, QString());
+        map.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&map, 15000));
+        for (int i = 0; i < 6; ++i) { map.zoomStep(+1); }
+        const QImage img = map.grab().toImage();
+        const double dpr = img.devicePixelRatio();
+        // Jeder Grenzpunkt im Bild (ausser unter Knoepfen und Legende) muss
+        // eine helle Linie unter sich haben.
+        const QRectF inner(20, 50, 860, 330);
+        const short* d = kiwiBorderData();
+        int at = 0, seen = 0, lit = 0;
+        for (int r = 0; r < kiwiBorderRingCount(); ++r) {
+            const int n = d[at++];
+            for (int i = 0; i < n; ++i) {
+                const QPointF q = map.toWidget(d[at + 2 * i + 1] / 100.0, d[at + 2 * i] / 100.0);
+                if (!inner.contains(q)) { continue; }
+                ++seen;
+                int best = 0;
+                for (int dx = -1; dx <= 1; ++dx) {
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        best = std::max(best, img.pixelColor(int((q.x() + dx) * dpr),
+                                                             int((q.y() + dy) * dpr)).lightness());
+                    }
+                }
+                if (best >= 60) { ++lit; }
+            }
+            at += 2 * n;
+        }
+        QVERIFY2(seen > 40, qPrintable(QString::number(seen)));
+        QVERIFY2(lit * 10 >= seen * 9,
+                 qPrintable(QStringLiteral("%1 von %2").arg(lit).arg(seen)));
     }
 
     void ausschnittFolgtDenOffenenKiwis()

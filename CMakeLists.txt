@@ -1090,6 +1090,7 @@ set(GUI_SOURCES
     src/gui/widgets/KiwiLostOverlay.cpp
     src/gui/KiwiHearingDialog.cpp
     src/gui/widgets/KiwiWorldCoast.cpp
+    src/gui/widgets/KiwiWorldBorders.cpp
     src/gui/LanScanDialog.cpp
     src/gui/LanScanDialog.h
     src/gui/PgxlSaveRebootDialog.cpp

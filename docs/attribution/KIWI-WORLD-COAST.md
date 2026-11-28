@@ -11,3 +11,13 @@
 - **Bearbeitung:** nur äußere Ringe, auf 0,1° gerundet, doppelte
   Folgepunkte entfernt. Erzeuger: `tools/make_kiwi_coast.py`.
 - Ausgelassen: Inseln kleiner als das 110-m-Raster, Binnenmeere als Löcher.
+
+## Ländergrenzen (2026-11-28)
+
+- **Datei:** `src/gui/widgets/KiwiWorldBorders.cpp` (erzeugt, nicht von Hand ändern)
+- **Quelle:** Natural Earth 1:110 Mio., `admin_0_countries`, Public Domain —
+  übernommen aus
+  `third_party/contestprogramm/resources/geo/country_borders_110m.dat`
+  (dort vereinfacht, Douglas-Peucker 0,03°).
+- **Erzeuger:** `tools/make_kiwi_borders.py`.
+

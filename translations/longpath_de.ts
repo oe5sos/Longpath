@@ -2754,101 +2754,97 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>(locator missing)</source>
         <translation>(Locator fehlt)</translation>
     </message>
-    <message>
-        <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="65"/>
-        <source>Oeffentliche KiwiSDR-Empfaenger</source>
-        <translation type="unfinished"></translation>
-    </message>
+    
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="71"/>
         <source>Filter by name, location, or host…</source>
-        <translation type="unfinished"></translation>
+        <translation>Nach Name, Ort oder Adresse filtern …</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="74"/>
         <source>Refresh list</source>
-        <translation type="unfinished"></translation>
+        <translation>Liste neu laden</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="75"/>
         <source>Re-fetch the public directory from the network.</source>
-        <translation type="unfinished"></translation>
+        <translation>Das öffentliche Verzeichnis neu aus dem Netz holen.</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="81"/>
         <source>Receiver</source>
-        <translation type="unfinished"></translation>
+        <translation>Empfänger</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="81"/>
         <source>Location</source>
-        <translation type="unfinished"></translation>
+        <translation>Ort</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="81"/>
         <source>Users</source>
-        <translation type="unfinished"></translation>
+        <translation>Belegt</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="81"/>
         <source>API</source>
-        <translation type="unfinished"></translation>
+        <translation>API</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="81"/>
         <source>Limits</source>
-        <translation type="unfinished"></translation>
+        <translation>Grenzen</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="94"/>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="133"/>
         <source>Loading public receivers…</source>
-        <translation type="unfinished"></translation>
+        <translation>Öffentliche Empfänger werden geladen …</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="101"/>
         <source>Add selected</source>
-        <translation type="unfinished"></translation>
+        <translation>Ausgewählten hinzufügen</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="116"/>
         <source>Could not load directory: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Verzeichnis nicht geladen: %1</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="217"/>
         <source>This receiver advertises connection limits, but the public directory does not publish the configured duration.</source>
-        <translation type="unfinished"></translation>
+        <translation>Dieser Empfänger meldet eine Zeitbegrenzung; die Dauer steht nicht im öffentlichen Verzeichnis.</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="221"/>
         <source>No connection limit is advertised in the public directory.</source>
-        <translation type="unfinished"></translation>
+        <translation>Im öffentlichen Verzeichnis ist keine Zeitbegrenzung gemeldet.</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="239"/>
         <source>%1 receivers allow API access</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 Empfänger erlauben den Zugriff durch Programme</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="242"/>
         <source>%1 web-only</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 nur im Browser</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="244"/>
         <source>%1 policy-unknown</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 ohne Angabe</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="246"/>
         <source> (%1 hidden)</source>
-        <translation type="unfinished"></translation>
+        <translation> (%1 ausgeblendet)</translation>
     </message>
     <message>
         <location filename="../src/gui/KiwiPublicReceiverPicker.cpp" line="248"/>
         <source>  ·  cached — use “Refresh list” to update</source>
-        <translation type="unfinished"></translation>
+        <translation>  ·  gespeichert — „Liste neu laden“ holt den neuen Stand</translation>
     </message>
     <message>
         <source>not reachable</source>
@@ -2889,6 +2885,18 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     <message>
         <source>Show or hide the world map. Drag the bar between map and list to resize.</source>
         <translation>Weltkarte ein- oder ausblenden. Den Balken zwischen Karte und Liste ziehen, um die Größe zu ändern.</translation>
+    </message>
+    <message>
+        <source>Public KiwiSDR receivers</source>
+        <translation>Öffentliche KiwiSDR-Empfänger</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>  ·  sorted by distance from %1</source>
+        <translation>  ·  nach Entfernung zu %1 geordnet</translation>
     </message>
 </context>
 <context>
@@ -8750,6 +8758,30 @@ Das bisherige behält seinen Aufbau — wie „Speichern unter“.</translation>
     <message>
         <source>Shows where public KiwiSDR receivers are and whether they are free, partly busy, full or not reachable. Hover a dot for details, click it to select the receiver.</source>
         <translation>Zeigt, wo öffentliche KiwiSDR-Empfänger stehen und ob sie frei, teilweise besetzt, voll oder nicht erreichbar sind. Über einen Punkt fahren für Einzelheiten, anklicken zum Auswählen.</translation>
+    </message>
+    <message>
+        <source>free</source>
+        <translation>frei</translation>
+    </message>
+    <message>
+        <source>partly busy</source>
+        <translation>teilweise besetzt</translation>
+    </message>
+    <message>
+        <source>full</source>
+        <translation>voll</translation>
+    </message>
+    <message>
+        <source>not reachable</source>
+        <translation>nicht erreichbar</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Vergrößern</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Verkleinern</translation>
     </message>
 </context>
 <context>
