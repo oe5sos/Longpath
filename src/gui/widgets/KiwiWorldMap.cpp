@@ -69,7 +69,7 @@ KiwiWorldMap::KiwiWorldMap(QWidget* parent)
     // Plus und Minus rechts oben; blau umrandet = anfassbar.
     const QString style = QStringLiteral(
         "QToolButton { color: %1; background: %2; border: 1px solid %3; "
-        "border-radius: 6px; font-size: 15px; }"
+        "border-radius: 6px; font-size: 16px; }"
         "QToolButton:hover { border-color: %4; }"
         "QToolButton:disabled { color: %5; border-color: %6; }")
             .arg(QString::fromLatin1(Style::kTextPrimary),
