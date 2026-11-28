@@ -526,7 +526,6 @@ private slots:
             {"tief.json",  false},
             {"moos.json",  true},
             {"blau-gold.json", true},
-            {"anthrazit.json", true},
         };
         for (const auto& e : f) {
             const QString pfad = wurzel + QString::fromLatin1(e.datei);

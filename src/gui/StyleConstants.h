@@ -697,8 +697,8 @@ inline void paintRaisedChip(QPainter& p, const QRect& box, int radius,
     p.save();
     p.setRenderHint(QPainter::Antialiasing, true);
     QLinearGradient g(box.topLeft(), box.bottomLeft());
-    const QColor top(Style::role("glass-btn-top", kGlassBtnTop));
-    const QColor bot(Style::role("glass-btn-bot", kGlassBtnBot));
+    const QColor top(role("glass-btn-top", kGlassBtnTop));
+    const QColor bot(role("glass-btn-bot", kGlassBtnBot));
     g.setColorAt(0.0, pressed ? bot : top);
     g.setColorAt(1.0, pressed ? top : bot);
     p.setBrush(g);
