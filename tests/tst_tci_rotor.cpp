@@ -37,6 +37,7 @@
 
 #include "core/AppSettings.h"
 #include "core/RotorController.h"
+#include "core/RufPeilung.h"
 #include "core/TciServer.h"
 #include "models/RadioModel.h"
 #include "TciBurstHelfer.h"
@@ -155,8 +156,9 @@ private slots:
         const QStringList f = ersteMit(QStringLiteral("rotor_peilung:"))
                                   .mid(QStringLiteral("rotor_peilung:").size())
                                   .chopped(1).split(QLatin1Char(','));
-        QCOMPARE(f.size(), 7);
+        QCOMPARE(f.size(), 8);
         QCOMPARE(f.at(0), QStringLiteral("JA1QRS"));
+        QCOMPARE(f.at(7), QStringLiteral("land"));   // Mitte des Landes
         const double kurz = f.at(1).toDouble();
         const double lang = f.at(4).toDouble();
         QVERIFY2(kurz > 20.0 && kurz < 70.0, qPrintable(f.at(1)));
@@ -166,6 +168,61 @@ private slots:
         QCOMPARE(f.at(5), QStringLiteral("0"));      // kurz: hinter dem Berg
         QCOMPARE(f.at(6), QStringLiteral("1"));      // lang: frei
         QVERIFY2(rot.m_ziele.isEmpty(), "eine Peilung darf nichts drehen");
+    }
+
+    // ── Peilung zu einem Locator (2026-11-27) ───────────────────────────
+    //
+    // Statt des Rufzeichens ein Locator: dann gilt genau dieser Ort, nicht
+    // die Mitte eines Landes. PM95 ist Tokio -- derselbe Berg, dieselbe
+    // Antwort auf "welcher Weg": kurz gesperrt, lang frei. Klein geschrieben,
+    // wie man es am Telefon tippt. `<land>` bleibt leer, `<quelle>` sagt
+    // `locator`. Und auch hier: nichts dreht sich.
+    void peilungZuEinemLocator()
+    {
+        auto& s = AppSettings::instance();
+        s.setValue(QStringLiteral("StationGridSquare"), QStringLiteral("JN67"));
+        s.setValue(QStringLiteral("Rotor/LimitOn"), QStringLiteral("True"));
+        s.setValue(QStringLiteral("Rotor/LimitFromDeg"), 180.0);
+        s.setValue(QStringLiteral("Rotor/LimitToDeg"), 0.0);
+
+        RadioModel model;
+        RotorAttrappe rot;
+        rot.m_az = 270.0; rot.m_frisch = true;
+        model.setRotor(&rot);
+        TciServer server(&model);
+        QWebSocket client;
+        QVERIFY2(aufbauen(server, client, /*drehenFrei=*/true), "Aufbau gescheitert");
+
+        client.sendTextMessage(QStringLiteral("rotor_peilung:pm95tq;"));
+        QVERIFY2(warteAuf(QStringLiteral("rotor_peilung:")),
+                 qPrintable(m_antworten.join(QLatin1Char(' '))));
+        const QStringList f = ersteMit(QStringLiteral("rotor_peilung:"))
+                                  .mid(QStringLiteral("rotor_peilung:").size())
+                                  .chopped(1).split(QLatin1Char(','));
+        QCOMPARE(f.size(), 8);
+        QCOMPARE(f.at(0), QStringLiteral("PM95TQ"));
+        const double kurz = f.at(1).toDouble();
+        const double lang = f.at(4).toDouble();
+        QVERIFY2(kurz > 25.0 && kurz < 55.0, qPrintable(f.at(1)));
+        QVERIFY2(std::abs(lang - (kurz + 180.0)) < 0.2, qPrintable(f.at(4)));
+        QVERIFY2(f.at(2).toInt() > 8500 && f.at(2).toInt() < 9800, qPrintable(f.at(2)));
+        QCOMPARE(f.at(3), QString());                 // kein Land
+        QCOMPARE(f.at(5), QStringLiteral("0"));       // kurz: hinter dem Berg
+        QCOMPARE(f.at(6), QStringLiteral("1"));       // lang: frei
+        QCOMPARE(f.at(7), QStringLiteral("locator"));
+        QVERIFY2(rot.m_ziele.isEmpty(), "eine Peilung darf nichts drehen");
+    }
+
+    /// Ein Locator ist kein Rufzeichen und umgekehrt.
+    void locatorOderRufzeichen()
+    {
+        QVERIFY(RufPeilung::istLocator(QStringLiteral("JN78")));
+        QVERIFY(RufPeilung::istLocator(QStringLiteral("jn78ab")));
+        QVERIFY(!RufPeilung::istLocator(QStringLiteral("OE5SOS")));
+        QVERIFY(!RufPeilung::istLocator(QStringLiteral("JA1QRS")));
+        QVERIFY(!RufPeilung::istLocator(QStringLiteral("DL1ABC")));
+        QVERIFY(!RufPeilung::istLocator(QStringLiteral("ZZ99")));   // ueber R
+        QVERIFY(!RufPeilung::istLocator(QStringLiteral("JN7")));
     }
 
     /// Ohne eigenen Locator keine Richtung -- und kein geratener Wert.

@@ -17,7 +17,7 @@ import { bildIstAlt } from './aufwachen.js';
 import { desktopStarten } from './desktop.js';
 import { zeiger as zeigerBauen, sEinheiten, SIG_KLEIN, SWR_KLEIN, kompassRund } from './instrument.js';
 import { standLesen, zustandText, fehlerText as rotorFehlerText,
-         peilungAus, peilungLesen, Sicherung as RotorSicherung,
+         peilungAus, peilungLesen, rufEingabe, istLocator, Sicherung as RotorSicherung,
          DREHT } from './rotor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2204,23 +2204,24 @@ $('ft8Liste').addEventListener('click', (e) => {
   // Rotorscheibe (Sicherung waehlen, dann bestaetigen, rotor_to). Er waehlt
   // die Zeile nicht ab.
   const knopf = e.target.closest('.ft8Dreh');
-  if (knopf) {
-    const g = Number(knopf.dataset.grad);
-    if (!knopf.disabled && Number.isFinite(g)) {
-      if (!rotorSicherung.gilt(performance.now()) || rotorSicherung.ziel !== g) {
-        rotorSicherung.waehle(g, performance.now());
-      }
-      rotorZeichnen();              // gibt den Knopf erst frei
-      $('rotorDreh').click();
-    }
-    return;
-  }
+  if (knopf) { wegDrehen(knopf); return; }
   if (z.classList.contains('ft8Peil')) { return; }
   ft8Markiert = ft8MarkiertIst(z.dataset.ruf) ? null
     : { ruf: z.dataset.ruf, bis: performance.now() + kFt8Hervor };
   if (ft8Markiert) { peilungFragen(ft8Markiert.ruf); }
   zeichneFt8();
 });
+
+/** KURZ/LANG gedrueckt (FT8-Zeile oder Rotorfeld): Ziel waehlen und drehen. */
+function wegDrehen(knopf) {
+  const g = Number(knopf.dataset.grad);
+  if (knopf.disabled || !Number.isFinite(g)) { return; }
+  if (!rotorSicherung.gilt(performance.now()) || rotorSicherung.ziel !== g) {
+    rotorSicherung.waehle(g, performance.now());
+  }
+  rotorZeichnen();              // gibt den Knopf erst frei
+  $('rotorDreh').click();
+}
 
 // ── Peilung zum Rufzeichen (2026-11-26) ─────────────────────────────────────
 // Longpath rechnet sie (rotor_peilung: -> cty.dat, Mitte des Landes, vom
@@ -2234,7 +2235,9 @@ function peilungFragen(ruf) {
   if (link.ready) { link.send(`rotor_peilung:${ruf}`); }
 }
 function peilungAnwenden(p) {
-  if (!ft8MarkiertIst(p.ruf) || !rotorFeldAn) { return; }
+  if (!rotorFeldAn) { return; }
+  if (istLocator(p.ruf) && p.quelle !== 'locator') { return; }   // altes Longpath
+  if (!ft8MarkiertIst(p.ruf) && p.ruf !== rotorRufGefragt) { return; }
   // Vorgewaehlt wird der Weg, den der Drehbereich erlaubt -- bei Martin ist
   // der Osten zu (Berg), nach Japan geht es nur ueber den langen Weg.
   const ziel = p.kurzFrei ? p.grad : (p.langFrei ? p.lang : null);
@@ -2250,6 +2253,7 @@ link.addEventListener('peilung', (e) => {
   ft8Peilungen.set(p.ruf, p);
   peilungAnwenden(p);
   zeichneFt8();
+  rotorPeilZeichnen();
 });
 link.addEventListener('peilungfehler', (e) => {
   const a = (e.detail || {}).args || [];
@@ -2257,6 +2261,69 @@ link.addEventListener('peilungfehler', (e) => {
   if (!ruf) { return; }
   ft8Peilungen.set(ruf, { ruf, fehler: (a[1] || 'unbekannt').trim() });
   zeichneFt8();
+  rotorPeilZeichnen();
+});
+
+// ── Rotor per Rufzeichen oder Locator (2026-11-27) ──────────────────────────
+// Im Rotorfeld eintippen (oder eine Spot-Schrift im Bild antippen): Longpath
+// peilt -- Rufzeichen ueber cty.dat (Mitte des Landes), Locator genau --, der
+// erlaubte Weg wird auf der Scheibe vorgewaehlt. Gedreht wird erst mit KURZ/
+// LANG oder dem Knopf; was der Drehbereich nicht erlaubt (der Berg im Osten),
+// steht gesperrt da. Dieselbe Abfrage und derselbe Speicher wie die FT8-Liste.
+let rotorRufGefragt = '';
+function rotorPeilen(text) {
+  const ruf = rufEingabe(text);
+  rotorRufGefragt = ruf;
+  if (!ruf) { rotorPeilZeichnen(); return; }
+  if ($('rotorRufFeld').value !== ruf) { $('rotorRufFeld').value = ruf; }
+  const p = ft8Peilungen.get(ruf);
+  if (p && p.grad !== undefined) { peilungAnwenden(p); }
+  else {
+    ft8Peilungen.delete(ruf);          // ein alter Fehler soll neu gefragt werden
+    if (link.ready) { link.send(`rotor_peilung:${ruf}`); }
+  }
+  rotorPeilZeichnen();
+}
+function rotorPeilZeichnen() {
+  const el = $('rotorPeil');
+  const ruf = rotorRufGefragt;
+  if (!ruf) { el.hidden = true; el.innerHTML = ''; return; }
+  const p = ft8Peilungen.get(ruf);
+  let html;
+  if (!p) {
+    html = `<span class="pText"><b>${ruf}</b><i>${link.ready ? 'Peilung wird gefragt …' : 'keine Verbindung'}</i></span>`;
+  } else if (p.fehler) {
+    html = `<span class="pText"><b>${ruf}</b><i>keine Peilung — ${p.fehler}</i></span>`;
+  } else if (istLocator(ruf) && p.quelle !== 'locator') {
+    // Ein Longpath vor 2026-11-27 kennt keine Locator und peilt "PM95" wie
+    // ein Rufzeichen ueber cty.dat -- eine Zahl, die nach etwas aussieht und
+    // falsch ist. Dann lieber keine Knoepfe.
+    html = `<span class="pText"><b>${ruf}</b><i>Locator kennt erst ein neueres Longpath</i></span>`;
+  } else {
+    // Oben WAS gepeilt wurde, darunter wie weit und wie genau. Das Rufzeichen
+    // steht schon im Feld; die Tausender mit Punkt wie ueberall hier.
+    const oben = p.quelle === 'locator' ? `Locator ${ruf}` : (p.land || ruf);
+    const km = p.km !== null ? String(p.km).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' km · ' : '';
+    const wie = p.quelle === 'locator' ? 'genau' : 'Landesmitte';
+    const knopf = (g, name, frei) => `<button type="button" class="ft8Dreh" data-grad="${g}"` +
+      `${frei ? '' : ' disabled title="ausserhalb des Drehbereichs"'}>${name} ${g}°</button>`;
+    html = `<span class="pText"><b>${oben}</b><i>${km}${wie}</i></span>` +
+      `<span class="ft8Wege">${knopf(p.grad, 'KURZ', p.kurzFrei)}${knopf(p.lang, 'LANG', p.langFrei)}</span>`;
+  }
+  if (el.dataset.bau !== html) { el.dataset.bau = html; el.innerHTML = html; }
+  el.hidden = false;
+}
+$('rotorRufFeld').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); rotorPeilen($('rotorRufFeld').value); $('rotorRufFeld').blur(); }
+});
+$('rotorPeilen').addEventListener('click', () => rotorPeilen($('rotorRufFeld').value));
+$('rotorRufFeld').addEventListener('input', () => {
+  // Wer weitertippt, meint etwas anderes: die alte Zeile weg.
+  if (rufEingabe($('rotorRufFeld').value) !== rotorRufGefragt) { rotorRufGefragt = ''; rotorPeilZeichnen(); }
+});
+$('rotorPeil').addEventListener('click', (e) => {
+  const knopf = e.target.closest('.ft8Dreh');
+  if (knopf) { wegDrehen(knopf); }
 });
 function peilungZeile(ruf) {
   const p = ft8Peilungen.get(ruf);
@@ -2632,6 +2699,9 @@ $('scope').addEventListener('pointerup', (e) => {
         clearTimeout(spotTipp.frist);
         spotTipp.frist = setTimeout(() => {
           spotTipp.ruf = null;
+          // Gibt es einen Rotor, steht das Rufzeichen auch gleich dort,
+          // gepeilt -- gedreht wird erst mit KURZ/LANG (2026-11-27).
+          if (rotorFeldAn) { rotorPeilen(schrift.ruf); }
           qrzOeffnen(schrift.ruf);
         }, 280);
       }

@@ -163,7 +163,11 @@ export class Sicherung {
  * `rotor_peilung:`-Argumente -> {ruf, grad, km, land, lang, kurzFrei, langFrei}
  * oder null.
  *
- *   rotor_peilung:<ruf>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>;
+ *   rotor_peilung:<ruf>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>,<quelle>;
+ *
+ * `<quelle>` (seit 2026-11-27): `land` = Mitte des Landes (grob), `locator` =
+ * genau der eingegebene Locator. Aeltere Longpath-Fassungen senden es nicht;
+ * dann ist es leer und gilt wie `land`.
  *
  * Die Peilung kommt aus Longpath (cty.dat, Mitte des Landes, vom eigenen
  * Locator aus) -- dieselbe Zahl, die das Rotor-Feld am Mac zuerst zeigt.
@@ -180,5 +184,22 @@ export function peilungLesen(args) {
   const langRoh = parseFloat(a[4]);
   const lang = isFinite(langRoh) ? Math.round(langRoh) % 360 : (kurz + 180) % 360;
   return { ruf, grad: kurz, km: isNaN(km) ? null : km, land: (a[3] || '').trim(),
-           lang, kurzFrei: (a[5] || '').trim() === '1', langFrei: (a[6] || '').trim() === '1' };
+           lang, kurzFrei: (a[5] || '').trim() === '1', langFrei: (a[6] || '').trim() === '1',
+           quelle: (a[7] || '').trim().toLowerCase() === 'locator' ? 'locator' : 'land' };
+}
+
+/**
+ * Was jemand ins Rotorfeld tippt -> was an `rotor_peilung:` geht, oder ''.
+ * Grossbuchstaben, ohne Leerzeichen; nur Buchstaben, Ziffern und `/`
+ * (Portabel-Zusaetze). Komma und Semikolon wuerden die TCI-Zeile zerlegen.
+ */
+export function rufEingabe(text) {
+  const t = String(text || '').toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z0-9/]{2,12}$/.test(t)) return '';
+  return t;
+}
+
+/** Locator (4 oder 6 Zeichen) wie Longpaths isValidGridSquare. */
+export function istLocator(text) {
+  return /^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(String(text || '').toUpperCase());
 }
