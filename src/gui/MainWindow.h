@@ -2377,6 +2377,11 @@ private:
     // Rauswurf durch den Server (Programm-Limit).
     QHash<QString, int> m_kiwiPrevState;
     bool kiwiEvictsPrograms(const QString& profileId) const;
+    // Endpunkte der Kiwis, die getrennt haben (fuer die Auswahl).
+    QSet<QString> kiwiEvictingEndpoints() const;
+    // Frequenz, der die Kiwis folgen: Sendescheibe, ohne Funkgeraet die Mitte
+    // des Panadapters; 0, wenn es beides nicht gibt.
+    double kiwiDisplayFrequencyHz() const;
     void setKiwiEvictsPrograms(const QString& profileId, bool evicts);
     bool m_kiwiAppletRefreshBlocked{false};
     bool m_kiwiAppletRefreshDirty{false};

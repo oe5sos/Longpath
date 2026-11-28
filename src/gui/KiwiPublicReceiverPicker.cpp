@@ -17,6 +17,7 @@
 
 #include <QAccessible>
 #include <QDialogButtonBox>
+#include <algorithm>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -261,6 +262,13 @@ void KiwiPublicReceiverPicker::applyFilter()
         }
         matches.append(&c);
     }
+    // Wo Longpath wohl keinen Platz bekommt, ans Ende; wer schon einmal
+    // getrennt hat, ganz nach hinten. Innerhalb gleicher Stufe bleibt die
+    // Reihenfolge (Entfernung).
+    std::stable_sort(matches.begin(), matches.end(),
+                     [this](const KiwiCandidate* a, const KiwiCandidate* b) {
+        return placeRank(a->receiver) < placeRank(b->receiver);
+    });
 
     // Bug fix 2026-09-07: this used to insertRow()+setItem() one row at a
     // time, re-running on EVERY keystroke in the search box. Each
@@ -304,7 +312,22 @@ void KiwiPublicReceiverPicker::applyFilter()
                           : QString()));
             m_table->setItem(row, UsersColumn, new QTableWidgetItem(
                 QStringLiteral("%1/%2").arg(r.users).arg(r.usersMax)));
-            m_table->setItem(row, ApiColumn, new QTableWidgetItem(r.apiBadge()));
+            auto* apiItem = new QTableWidgetItem(r.apiBadge());
+            const int rank = placeRank(r);
+            if (rank == 2) {
+                apiItem->setText(tr("%1 · disconnected Longpath").arg(r.apiBadge()));
+                apiItem->setToolTip(tr("This Kiwi disconnected Longpath shortly after "
+                                       "connecting: its places for programs were full."));
+            } else if (rank == 1) {
+                apiItem->setText(tr("%1 · probably full").arg(r.apiBadge()));
+                apiItem->setToolTip(tr("As many users as the operator allows programs: "
+                                       "this Kiwi will probably disconnect Longpath "
+                                       "after a few seconds."));
+            }
+            if (rank > 0) {
+                apiItem->setForeground(QColor(QLatin1String(Style::kAmberWarn)));
+            }
+            m_table->setItem(row, ApiColumn, apiItem);
 
             auto* limitsItem = new QTableWidgetItem(r.connectionLimitBadge());
             if (r.advertisesConnectionLimit()) {
@@ -367,6 +390,12 @@ void KiwiPublicReceiverPicker::showReceiversForTest(
     onReady(receivers);
 }
 
+int KiwiPublicReceiverPicker::placeRank(const KiwiPublicReceiver& r) const
+{
+    if (m_evicting.contains(endpointFromUrl(r.url))) { return 2; }
+    return r.programPlacesProbablyFull() ? 1 : 0;
+}
+
 void KiwiPublicReceiverPicker::rebuildMap(
     const QVector<const KiwiCandidate*>& matches)
 {
@@ -379,7 +408,8 @@ void KiwiPublicReceiverPicker::rebuildMap(
         pt.name = r.name.isEmpty() ? r.url : r.name;
         if (useForced) {
             pt.state = forced;
-        } else if (r.usersMax > 0 && r.users >= r.usersMax) {
+        } else if (placeRank(r) > 0
+                   || (r.usersMax > 0 && r.users >= r.usersMax)) {
             pt.state = KiwiMapPoint::State::Full;
         } else if (r.users > 0) {
             pt.state = KiwiMapPoint::State::Partial;

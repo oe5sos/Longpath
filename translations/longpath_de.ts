@@ -2898,6 +2898,22 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <source>  ·  sorted by distance from %1</source>
         <translation>  ·  nach Entfernung zu %1 geordnet</translation>
     </message>
+    <message>
+        <source>%1 · disconnected Longpath</source>
+        <translation>%1 · hat getrennt</translation>
+    </message>
+    <message>
+        <source>%1 · probably full</source>
+        <translation>%1 · wohl voll</translation>
+    </message>
+    <message>
+        <source>This Kiwi disconnected Longpath shortly after connecting: its places for programs were full.</source>
+        <translation>Dieser Kiwi hat Longpath kurz nach dem Verbinden getrennt: seine Plätze für Programme waren voll.</translation>
+    </message>
+    <message>
+        <source>As many users as the operator allows programs: this Kiwi will probably disconnect Longpath after a few seconds.</source>
+        <translation>So viele Nutzer, wie der Betreiber Programme zulässt: dieser Kiwi wird Longpath wohl nach einigen Sekunden trennen.</translation>
+    </message>
 </context>
 <context>
     <name>Longpath::KiwiSdrApplet</name>

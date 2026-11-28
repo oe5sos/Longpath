@@ -12328,6 +12328,7 @@ void MainWindow::buildMenuBar()
             this, [this]() {
                 auto* picker = new KiwiPublicReceiverPicker(this);
                 picker->setAttribute(Qt::WA_DeleteOnClose);
+                picker->setEvictingEndpoints(kiwiEvictingEndpoints());
                 connect(picker, &QDialog::accepted, this, [this, picker]() {
                     addKiwiSdrReceiver(picker->selectedName(),
                                        picker->selectedEndpoint());

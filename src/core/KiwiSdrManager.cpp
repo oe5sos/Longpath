@@ -1092,6 +1092,7 @@ void KiwiSdrManager::primeProfileTracking(const QString& id, int sliceId,
     if (!hasProfile(id) || sliceId < 0 || frequencyMhz <= 0.0) {
         return;
     }
+    m_primedMhz.insert(id, frequencyMhz);
 
     if (KiwiSdrClient* c = ensureClient(id)) {
         Q_UNUSED(c);

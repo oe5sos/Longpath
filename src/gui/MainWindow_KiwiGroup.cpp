@@ -361,6 +361,27 @@ bool MainWindow::kiwiEvictsPrograms(const QString& profileId) const
         .split(QLatin1Char(';'), Qt::SkipEmptyParts).contains(profileId);
 }
 
+QSet<QString> MainWindow::kiwiEvictingEndpoints() const
+{
+    QSet<QString> out;
+    if (!m_kiwiSdrManager) { return out; }
+    for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
+        if (kiwiEvictsPrograms(pr.id)) { out.insert(pr.endpoint); }
+    }
+    return out;
+}
+
+double MainWindow::kiwiDisplayFrequencyHz() const
+{
+    if (SliceModel* tx = kiwiOwnTxSlice(); tx && m_radioModel) {
+        quint64 hz = m_radioModel->transmitFrequencyHz(tx);
+        if (hz == 0) { hz = quint64(tx->frequency()); }
+        return double(hz);
+    }
+    const SpectrumWidget* pan = activeSpectrumWidget();
+    return pan ? pan->centerFrequency() : 0.0;
+}
+
 void MainWindow::setKiwiEvictsPrograms(const QString& profileId, bool evicts)
 {
     QStringList ids = AppSettings::instance().value(kKiwiEvictingKey).toString()
@@ -835,11 +856,9 @@ void MainWindow::addKiwiToGroupFromPicker(const QString& replaceId)
         showToast(tr("All five places are taken."), ToastSeverity::Warning, 6000);
         return;
     }
-    double freqHz = 0.0;
-    if (SliceModel* tx = kiwiOwnTxSlice(); tx && m_radioModel) {
-        freqHz = double(m_radioModel->transmitFrequencyHz(tx));
-    }
+    const double freqHz = kiwiDisplayFrequencyHz();
     auto* picker = new KiwiPublicReceiverPicker(this);
+    picker->setEvictingEndpoints(kiwiEvictingEndpoints());
     picker->setAttribute(Qt::WA_DeleteOnClose);
     picker->setWindowTitle(replaceId.isEmpty() ? tr("Add a Kiwi that listens along")
                                               : tr("Choose another Kiwi"));
@@ -978,7 +997,9 @@ void MainWindow::sendKiwiGroupTracking()
         if (m_kiwiSdrManager->assignedSliceForProfile(gid) < 0) { ids << gid; }
     }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
-        if ((m_kiwiOwnSignalOn && pr.id == m_kiwiOwnProfileId)
+        // Den Kiwi von "Mein Signal" fuehrt die Sendescheibe -- gibt es keine,
+        // gehoert er hier dazu.
+        if ((m_kiwiOwnSignalOn && pr.id == m_kiwiOwnProfileId && kiwiOwnTxSlice())
             || ids.contains(pr.id)) {
             continue;
         }
@@ -1034,24 +1055,22 @@ void MainWindow::sendKiwiGroupTracking()
     // neu anfordern -- das Ruckeln. Es laeuft nur bei echten Aenderungen.)
     if (ids.isEmpty()) { return; }
     SliceModel* tx = kiwiOwnTxSlice();
-    if (!tx) {
-        static bool warnedNoTx = false;
-        if (!warnedNoTx) {
-            warnedNoTx = true;
-            qCInfo(lcKiwiSdr) << "Abstimmung der Vorschau-Kiwis: keine Sendescheibe (kein Funkgeraet?)";
-        }
-        return;
-    }
-    quint64 txHz = m_radioModel->transmitFrequencyHz(tx);
-    if (txHz == 0) { txHz = quint64(tx->frequency()); }
+    // Ohne Funkgeraet folgt der Kiwi der Anzeige (2026-11-28: sonst stand er
+    // auf 15000 kHz, waehrend der Panadapter 14,225 MHz zeigte).
+    const quint64 txHz = quint64(kiwiDisplayFrequencyHz());
     if (txHz == 0) { return; }
+    // SSB wie am Band ueblich, solange keine Scheibe etwas anderes sagt.
+    const bool upper = txHz >= 10000000;
+    const DSPMode mode = tx ? tx->dspMode() : (upper ? DSPMode::USB : DSPMode::LSB);
+    const int filterLow = tx ? tx->filterLow() : (upper ? 100 : -2900);
+    const int filterHigh = tx ? tx->filterHigh() : (upper ? 2900 : -100);
 
     if (m_kiwiGroup.size() > 0) {
         m_kiwiGroup.setMarkHz(double(txHz));
         if (m_kiwiHearingDialog) { m_kiwiHearingDialog->setMarkHz(double(txHz)); }
     }
 
-    SpectrumWidget* sw = spectrumForSlice(tx);
+    const SpectrumWidget* sw = tx ? spectrumForSlice(tx) : activeSpectrumWidget();
     const double bw = sw ? std::clamp(sw->bandwidth(), kMinViewHz, kMaxViewHz) : 40000.0;
     static QSet<QString> logged;
     for (int i = 0; i < ids.size(); ++i) {
@@ -1060,13 +1079,14 @@ void MainWindow::sendKiwiGroupTracking()
             logged.insert(ids[i]);
             qCInfo(lcKiwiSdr).noquote()
                 << "Abstimmung" << profile.name << "auf" << double(txHz) / 1.0e6
-                << "MHz" << SliceModel::modeName(tx->dspMode())
+                << "MHz" << SliceModel::modeName(mode)
+                << (tx ? "" : "(Anzeige, ohne Funkgeraet)")
                 << (m_kiwiGroup.contains(ids[i]) ? "(Mithoerer)" : "(Vorschau)");
         }
         m_kiwiSdrManager->primeProfileTracking(
             ids[i], kListenerTrackingBase + i,
-            double(txHz) / 1.0e6, SliceModel::modeName(tx->dspMode()),
-            tx->filterLow(), tx->filterHigh(),
+            double(txHz) / 1.0e6, SliceModel::modeName(mode),
+            filterLow, filterHigh,
             QStringLiteral("kiwi-group"), double(txHz) / 1.0e6,
             m_kiwiViewSpanHz.value(ids[i], bw) / 1.0e6,
             profile.waterfallRate, QString(), SliceModel::cwPitchHz());

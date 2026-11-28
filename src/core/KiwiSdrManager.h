@@ -164,6 +164,11 @@ public slots:
     void disconnectAll();
     void setOperatorCallsign(const QString& callsign);
     void startAutoConnect();
+    // Pruefstand: die zuletzt vorgegebene Frequenz (0: keine).
+    double primedFrequencyMhzForTest(const QString& id) const
+    {
+        return m_primedMhz.value(id, 0.0);
+    }
     void primeProfileTracking(const QString& id, int sliceId,
                               double frequencyMhz, const QString& mode,
                               int filterLowHz, int filterHighHz,
@@ -286,6 +291,7 @@ private:
     QHash<QString, QString> m_stateDetails;
     QHash<QString, KiwiSdrReceiverTelemetry> m_telemetry;
     QHash<QString, bool> m_waterfallAvailable;
+    QHash<QString, double> m_primedMhz;
     QHash<QString, QString> m_waterfallDetails;
     QHash<QString, KiwiSdrWaterfallDisplayRange> m_waterfallDisplayRanges;
     QHash<int, QString> m_sliceAssignments;

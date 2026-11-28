@@ -227,6 +227,36 @@ private slots:
         QVERIFY(dlg.mapForTest()->isVisible());
     }
 
+    // 2026-11-28 an Martins Station: ein Kiwi mit 4 Programm-Plaetzen bei
+    // 4 Nutzern warf Longpath nach 9 Sekunden hinaus.
+    void volleProgrammPlaetzeStehenHinten()
+    {
+        KiwiPublicReceiverPicker dlg;
+        dlg.setPreselection(QStringLiteral("JN67VV"), 0.0);
+        dlg.setEvictingEndpoints({QStringLiteral("raus.example:8073")});
+        dlg.showReceiversForTest({
+            // Name, Host, Ort, Nutzer, Plaetze, davon fuer Programme
+            rx("Raus",  "raus.example",  "(48.00, 13.90)", 1, 8, 8),   // am naechsten
+            rx("Knapp", "knapp.example", "(48.30, 14.30)", 4, 8, 4),   // 4 >= 4
+            rx("Frei",  "frei.example",  "(48.90, 2.40)",  2, 8, 4),
+            rx("Offen", "offen.example", "(43.70, 10.40)", 5, 8, 8),
+        });
+        QTableWidget* table = dlg.tableForTest();
+        QCOMPARE(table->rowCount(), 4);
+        QStringList order;
+        for (int r = 0; r < table->rowCount(); ++r) { order << table->item(r, 0)->text(); }
+        // Zuerst die brauchbaren nach Entfernung, dann der knappe, ganz hinten
+        // wer schon getrennt hat.
+        QCOMPARE(order, QStringList({"Offen", "Frei", "Knapp", "Raus"}));
+        const int api = 4;
+        QVERIFY2(table->item(2, api)->text().contains(QStringLiteral("probably full")),
+                 qPrintable(table->item(2, api)->text()));
+        QVERIFY2(table->item(3, api)->text().contains(QStringLiteral("disconnected")),
+                 qPrintable(table->item(3, api)->text()));
+        QVERIFY(!table->item(0, api)->text().contains(QStringLiteral("full")));
+        QVERIFY(!table->item(2, api)->toolTip().isEmpty());
+    }
+
     void dialogZeigtDieselbenWieDieTabelle()
     {
         KiwiPublicReceiverPicker dlg;

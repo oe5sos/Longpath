@@ -312,11 +312,9 @@ void MainWindow::setKiwiOwnSignalProfile(const QString& profileId, double km)
 void MainWindow::chooseOtherKiwi()
 {
     qCInfo(lcKiwiSdr) << "Anderer Kiwi: Auswahl wird geoeffnet";
-    double freqHz = 0.0;
-    if (SliceModel* tx = kiwiOwnTxSlice(); tx && m_radioModel) {
-        freqHz = double(m_radioModel->transmitFrequencyHz(tx));
-    }
+    const double freqHz = kiwiDisplayFrequencyHz();
     auto* picker = new KiwiPublicReceiverPicker(this);
+    picker->setEvictingEndpoints(kiwiEvictingEndpoints());
     picker->setAttribute(Qt::WA_DeleteOnClose);
     picker->setPreselection(AppSettings::stationGridSquare(), freqHz);
     const QPointer<KiwiPublicReceiverPicker> guard(picker);

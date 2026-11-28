@@ -36,6 +36,7 @@
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/MainWindow.h"
+#include "gui/SpectrumWidget.h"
 #include "gui/applets/AppletVisibilityController.h"
 #include "gui/widgets/KiwiLostOverlay.h"
 #include "gui/applets/KiwiSdrApplet.h"
@@ -416,6 +417,30 @@ private slots:
         QTRY_VERIFY(panel->stripForTest(aus));
         QTest::qWait(1600);
         QVERIFY(vis->isEffectivelyVisible(win));
+    }
+
+    // 2026-11-28: ohne Funkgeraet stand ein neuer Kiwi auf 15000 kHz, waehrend
+    // der Panadapter 14,225 MHz zeigte.
+    void ohneFunkgeraetFolgtDerKiwiDerAnzeige()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        QVERIFY(mw->radioModelForTest()->slices().isEmpty());   // kein Geraet
+        SpectrumWidget* pan = mw->activeSpectrumWidget();
+        QVERIFY(pan);
+        pan->setFrequencyRange(14.225e6, 40000.0);
+
+        QTcpServer stumm;
+        QVERIFY(stumm.listen(QHostAddress::LocalHost, 0));
+        const QString id = profile(mgr, "Vorschau", stumm.serverPort());
+        mgr->setWaterfallPreviewEnabled(id, true);
+        QTRY_COMPARE_WITH_TIMEOUT(mgr->primedFrequencyMhzForTest(id), 14.225, 4000);
+        pan->setFrequencyRange(7.100e6, 40000.0);
+        QTRY_COMPARE_WITH_TIMEOUT(mgr->primedFrequencyMhzForTest(id), 7.1, 4000);
     }
 
     // "Radio stumm": nur mit einem hoerbaren Kiwi, nur Wiedergabe, geht von

@@ -69,6 +69,10 @@ public:
     // Ring und Linie vom eigenen Standort. Reine Anzeige.
     void setOpenEndpoints(const QSet<QString>& endpoints);
 
+    // Endpunkte, die Longpath schon einmal hinausgeworfen haben: markiert und
+    // nach hinten gereiht. Vor dem Laden der Liste setzen.
+    void setEvictingEndpoints(const QSet<QString>& endpoints) { m_evicting = endpoints; }
+
     // Fuer die Pruefung.
     KiwiWorldMap* mapForTest() const { return m_map; }
     QTableWidget* tableForTest() const { return m_table; }
@@ -76,6 +80,8 @@ public:
     void showReceiversForTest(const QVector<KiwiPublicReceiver>& receivers);
 
 private:
+    // 0 brauchbar, 1 Programm-Plaetze wohl voll, 2 hat schon getrennt.
+    int placeRank(const KiwiPublicReceiver& receiver) const;
     void rebuildMap(const QVector<const struct KiwiCandidate*>& matches);
     void startFetch();
     void onReady(const QVector<KiwiPublicReceiver>& receivers);
@@ -92,6 +98,7 @@ private:
     QSplitter*    m_split{nullptr};
     QVector<KiwiPublicReceiver> m_offlineReceivers;  // nur fuer die Karte
     QSet<QString> m_openEndpoints;
+    QSet<QString> m_evicting;
     bool m_fetchEnabled{true};
     QLineEdit*    m_search{nullptr};
     QTableWidget* m_table{nullptr};

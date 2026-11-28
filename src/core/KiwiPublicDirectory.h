@@ -64,6 +64,15 @@ struct KiwiPublicReceiver {
     // treated conservatively as "do not assume API is allowed".
     bool mayConnectViaApi() const { return extApi > 0; }
 
+    // Wahrscheinlich kein Programm-Platz frei: der Betreiber haelt Plaetze
+    // fuer den Browser zurueck, und es sind schon mindestens so viele Nutzer
+    // da, wie Programme zugelassen sind. Das Verzeichnis zaehlt Browser mit,
+    // darum nur "wahrscheinlich" (2026-11-28: 4 Nutzer, 4 Programm-Plaetze,
+    // Rauswurf nach 9 s).
+    bool programPlacesProbablyFull() const {
+        return apiPolicy() == ApiPolicy::Limited && users >= extApi;
+    }
+
     // Short human-readable badge for the receiver picker.
     QString apiBadge() const;
     bool advertisesConnectionLimit() const;
