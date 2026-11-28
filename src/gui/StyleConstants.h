@@ -429,6 +429,22 @@ constexpr auto kPlusBorder      = "#f5c56a";
 // die Zeile leuchtet.
 constexpr auto kFt8NaechsterBg  = "#121110";
 
+// ── Der Netzschalter in der Leiste (Entwurf A, 2026-11-27) ──────────
+//
+// Die Stations-Pille unten ist der Ein/Aus-Schalter des Geraets
+// (widgets/StationBlock). Betreiber am Entwurfsblatt: „a". Ein ist das
+// Messing der Sendetaste, verbindet ist kTxKeyBottom, aus ist ein
+// stilles Schiefer -- kein Gruen, keine rote Strichellinie mehr.
+constexpr auto kNetzEin         = "#c9a04e";   // Rand, Knopf und Zeichen: ein
+constexpr auto kNetzEinGrund    = "#1a1610";   // Knopfgrund: ein
+constexpr auto kNetzAusRand     = "#3a4656";   // Rand und Knopfring: aus
+constexpr auto kNetzAusZeichen  = "#6a7888";   // Zeichen ⏻: aus
+constexpr auto kNetzAusGrund    = "#12161e";   // Knopfgrund: aus/verbindet
+constexpr auto kNetzAusName     = "#8090a0";   // Geraetename: aus
+constexpr auto kNetzName        = "#c8d8e8";   // Geraetename: ein/verbindet
+constexpr auto kNetzLeise       = "#607080";   // zweite Zeile
+constexpr auto kNetzFlaeche     = "#0a0a14";   // Grund der Pille
+
 // Eine Marke IM versenkten Feld, die nur andeuten soll, wo etwas
 // anfaengt und aufhoert — im FT8-Fensterbalken sind das Signalanfang
 // und -ende. Dunkles Messing: dieselbe Familie wie kTxKeyBottom, aber

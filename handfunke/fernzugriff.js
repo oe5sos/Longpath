@@ -59,6 +59,7 @@ const PRAEFIX_INTRODUCE = TEXT.encode('NereusSDR introduce v1\n');
 const PRAEFIX_ANMELDUNG = TEXT.encode('Longpath fernzugriff anmeldung v1\n');
 
 const KANAL = 'longpath-tci';
+const KANAL_TON = 'longpath-ton';
 
 // ── Opus ──────────────────────────────────────────────────────────────────
 //
@@ -88,6 +89,7 @@ function kannOpus() {
 // Versuch geht damit los (genauso macht es die Station). Im Mobilfunk hinter
 // CGNAT ist das der Unterschied zwischen "kommt durch" und "nie".
 const TURN_RESERVE_S = 600;
+const VERSUCH_FRIST_MS = 40000;
 
 function turnLesen(stationId) {
   try {
@@ -200,9 +202,26 @@ export class FernLeitung extends EventTarget {
     this._opusRate = 0;
     this._pc = null;
     this._kanal = null;
+    this._tonkanal = null;
     this._ws = null;
     this._angemeldet = false;
+    this._fristSetzen();
     this._los();
+  }
+
+  /**
+   * Ein Versuch darf stehen bleiben, solange ICE noch arbeitet: 40 s, dann
+   * ist er verloren. Aufgeben vorher nur, wenn ICE selbst sagt `failed`.
+   * (Am 2026-11-21 riss die Seite im Mobilfunk Versuche nach 3 bis 28 s
+   * ab und begann neu; keiner stand je lange genug.)
+   */
+  _fristSetzen() {
+    clearTimeout(this._frist);
+    this._frist = setTimeout(() => {
+      if (!this._angemeldet && this.readyState === 0) {
+        this._fehler(new Error('keine Verbindung binnen 40 s'));
+      }
+    }, VERSUCH_FRIST_MS);
   }
 
   async _los() {
@@ -227,7 +246,15 @@ export class FernLeitung extends EventTarget {
     if (hallo.type !== 'hello') { throw new Error(`erst kam ${hallo.type}, nicht hello`); }
 
     const stun = (hallo.stun || []).map((u) => ({ urls: u }));
-    const aufgehoben = turnLesen(this.stationId);
+    let aufgehoben = turnLesen(this.stationId);
+    if (!aufgehoben) {
+      // Erst die Zugangsdaten holen, DANN das echte Angebot machen: der
+      // Browser sammelt beim Angebot, und TURN kann er nachher nicht mehr
+      // aufnehmen.
+      await this._turnVorab(ich);
+      aufgehoben = turnLesen(this.stationId);
+      if (this.readyState === 3) { return; }
+    }
     this._mitTurn = !!aufgehoben;
     if (aufgehoben) {
       stun.push({ urls: aufgehoben.urls, username: aufgehoben.username,
@@ -235,11 +262,33 @@ export class FernLeitung extends EventTarget {
     }
     const pc = new RTCPeerConnection({ iceServers: stun, iceCandidatePoolSize: 0 });
     this._pc = pc;
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' && !this._angemeldet && this._pc === pc) {
+        this._fehler(new Error('ICE ist gescheitert'));
+      }
+    };
 
     const kanal = pc.createDataChannel(KANAL, { ordered: true });
     kanal.binaryType = 'arraybuffer';
     this._kanal = kanal;
     this._verdrahte(kanal, ich);
+
+    // Ein zweiter Kanal nur fuer den Ton der Station: ungeordnet, ohne
+    // Wiederholung. Auf dem geordneten haelt ein verlorenes Datagramm alle
+    // folgenden Bloecke (und Befehle) auf, bis seine Wiederholung da ist --
+    // fuer 20 ms Ton viel zu teuer. Die Station schickt Opus nur dorthin,
+    // wenn der Kanal offen und das Geraet angemeldet ist; sonst bleibt alles
+    // wie es war. Was hier ankommt, zaehlt erst nach der Anmeldung.
+    try {
+      const ton = pc.createDataChannel(KANAL_TON, { ordered: false, maxRetransmits: 0 });
+      ton.binaryType = 'arraybuffer';
+      this._tonkanal = ton;
+      ton.onmessage = (ev) => {
+        if (this._angemeldet && this.ton === 'opus' && ev.data instanceof ArrayBuffer) {
+          this._opusRahmen(ev.data);
+        }
+      };
+    } catch (e) { this._tonkanal = null; }
 
     // Kandidaten einzeln nachreichen (trickle): ein Angebot, das auf das
     // Sammeln wartet, kostet im Mobilfunk mehrere Sekunden, bevor
@@ -275,6 +324,58 @@ export class FernLeitung extends EventTarget {
     }));
   }
 
+  /**
+   * Eine kurze Einfuehrung nur zum Abholen der TURN-Zugangsdaten.
+   *
+   * Der Vermittler gibt sie erst heraus, wenn die Station eine Einfuehrung
+   * beantwortet. Das Angebot hier ist ein Wegwerf-Angebot: es wird nie
+   * gesetzt, hat keine Kandidaten, und niemand verbindet sich damit. Scheitert
+   * die Abholung (acht Sekunden), geht der Versuch ohne TURN weiter.
+   */
+  async _turnVorab(ich) {
+    let ws = null;
+    let pc = null;
+    try {
+      await new Promise((ok, weg) => {
+        const frist = setTimeout(() => weg(new Error('Abholung dauert zu lange')), 8000);
+        ws = new WebSocket(this.dienstUrl);
+        ws.onerror = () => { clearTimeout(frist); weg(new Error('Abholung: Dienst nicht erreichbar')); };
+        ws.onclose = () => { clearTimeout(frist); weg(new Error('Abholung: Dienst hat zugemacht')); };
+        ws.onmessage = async (ev) => {
+          try {
+            const m = JSON.parse(ev.data);
+            if (m.type === 'hello') {
+              pc = new RTCPeerConnection({ iceServers: [] });
+              pc.createDataChannel(KANAL);
+              const angebot = await pc.createOffer();   // bewusst NICHT gesetzt
+              const transkript = verkette(
+                PRAEFIX_INTRODUCE, TEXT.encode(this.stationId), unb64url(m.nonce));
+              ws.send(JSON.stringify({
+                type: 'introduce',
+                id: this.stationId,
+                device: ich.ident,
+                deviceSignature: await unterschreibe(ich.privat, transkript),
+                offer: angebot.sdp,
+              }));
+            } else if (m.type === 'answer') {
+              if (m.turn && m.turn.urls) { turnMerken(this.stationId, m.turn); }
+              clearTimeout(frist);
+              ok();
+            } else if (m.type === 'error') {
+              clearTimeout(frist);
+              weg(new Error(m.code || 'Abholung abgelehnt'));
+            }
+          } catch (e) { clearTimeout(frist); weg(e); }
+        };
+      });
+    } catch (e) {
+      console.warn('TURN-Abholung:', e && e.message ? e.message : e);
+    } finally {
+      if (ws) { ws.onclose = ws.onerror = ws.onmessage = null; try { ws.close(); } catch (e) {} }
+      try { pc?.close(); } catch (e) {}
+    }
+  }
+
   async _vomDienst(m) {
     const pc = this._pc;
     if (m.type === 'answer') {
@@ -290,7 +391,7 @@ export class FernLeitung extends EventTarget {
         turnMerken(this.stationId, m.turn);
         if (!this._mitTurn && !this._zweiter) {
           this._zweiter = true;
-          this._zweiterTimer = setTimeout(() => this._nocheinmal(), 6000);
+          this._zweiterTimer = setTimeout(() => this._nocheinmal(), VERSUCH_FRIST_MS - 5000);
         }
       }
       await pc.setRemoteDescription({ type: 'answer', sdp: m.answer });
@@ -326,6 +427,7 @@ export class FernLeitung extends EventTarget {
     try { this._pc?.close(); } catch (e) {}
     try { this._ws?.close(); } catch (e) {}
     this._pc = this._kanal = this._tonkanal = this._ws = null;
+    this._fristSetzen();
     this._los();
   }
 
@@ -501,7 +603,9 @@ export class FernLeitung extends EventTarget {
   _zu(code, grund) {
     if (this.readyState === 3) { return; }
     clearTimeout(this._zweiterTimer);
+    clearTimeout(this._frist);
     this.readyState = 3;            // CLOSED
+    try { this._tonkanal?.close(); } catch (e) {}
     try { this._kanal?.close(); } catch (e) {}
     try { this._pc?.close(); } catch (e) {}
     try { this._ws?.close(); } catch (e) {}
