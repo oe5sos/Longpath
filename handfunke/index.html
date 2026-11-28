@@ -286,6 +286,17 @@ body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
       <button id="rotorStop" class="rotorStop" type="button">STOP</button>
     </div>
   </div>
+  <!-- Rotor per Rufzeichen oder Locator (2026-11-27, Entwurf A): Longpath
+       peilt (rotor_peilung:), der erlaubte Weg wird vorgewaehlt; KURZ/LANG
+       drehen wie in der FT8-Liste, gesperrte Wege stehen grau da. -->
+  <div class="rotorRuf">
+    <input id="rotorRufFeld" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="characters" autocorrect="off" spellcheck="false"
+           maxlength="12" enterkeyhint="search" placeholder="RUFZEICHEN ODER LOCATOR"
+           aria-label="Rufzeichen oder Locator">
+    <button id="rotorPeilen" class="rotorPeilen" type="button">PEILEN</button>
+  </div>
+  <div class="ft8Peil rotorPeil" id="rotorPeil" hidden></div>
 </div>
 
 <div class="txrow">

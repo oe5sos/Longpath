@@ -80,6 +80,8 @@ EINGETRAGEN = []
 # --rotorfrei schaltet das Drehen frei; ohne das wird abgelehnt, genau wie
 # TciAllowRemoteRotor ab Werk.
 ROTOR_FREI = '--rotorfrei' in sys.argv
+# --alte-peilung: rotor_peilung ohne <quelle>, wie Longpath vor 2026-11-27.
+ALTE_PEILUNG = '--alte-peilung' in sys.argv
 # Zustand als NAME, wie `rotor_ist:` ihn seit dem 2026-10-07 sendet.
 ROTOR = {'ist': 143.0, 'ziel': 143.0, 'zustand': 'bereit', 'frisch': True}
 # --rotorstand N: Anfangsstellung des Rotors (fuer Entwurfsblaetter; 143 liegt
@@ -150,6 +152,23 @@ PREFIX_LAGE = [
     ('G',  (52.8, -1.5, 'England')),
     ('HB9', (46.9, 8.0, 'Switzerland')),
 ]
+
+
+def _locator_lage(text):
+    """Mitte eines 4/6-stelligen Locators (Breite, Laenge Ost) oder None."""
+    import re
+    t = text.upper()
+    if not re.fullmatch(r'[A-R]{2}[0-9]{2}([A-X]{2})?', t):
+        return None
+    lo = (ord(t[0]) - 65) * 20 - 180 + int(t[2]) * 2
+    la = (ord(t[1]) - 65) * 10 - 90 + int(t[3])
+    if len(t) == 6:
+        lo += (ord(t[4]) - 65) * (2 / 24) + 1 / 24
+        la += (ord(t[5]) - 65) * (1 / 24) + 1 / 48
+    else:
+        lo += 1
+        la += 0.5
+    return (la, lo)
 
 
 def _grosskreis(von, nach):
@@ -486,7 +505,10 @@ class Verbindung(threading.Thread):
             # Prefix, Peilung und Entfernung vom eigenen Standort. Die Attrappe
             # kennt nur eine Handvoll Prefixe -- genug fuer die FT8-Funde oben.
             ruf = (args[0].strip().upper() if args else '')
-            ziel = next((v for k, v in PREFIX_LAGE if ruf.startswith(k)), None)
+            # Seit 2026-11-27 auch ein Locator: dann genau dieser Ort.
+            # --alte-peilung: wie Longpath vor 2026-11-27 (kein 8. Feld).
+            loc = _locator_lage(ruf)
+            ziel = (loc + ('',)) if loc else next((v for k, v in PREFIX_LAGE if ruf.startswith(k)), None)
             if not ruf or ziel is None:
                 self.sende_text(f'rotor_peilung_err:{ruf},unbekanntes prefix;')
             else:
@@ -495,7 +517,9 @@ class Verbindung(threading.Thread):
                 # Drehbereich wie bei Martin: nur die Westhaelfte 180..360.
                 frei = lambda g: 1 if g >= 180 else 0
                 self.sende_text(f'rotor_peilung:{ruf},{grad:.1f},{km:.0f},{ziel[2]},'
-                                f'{lang:.1f},{frei(grad)},{frei(lang)};')
+                                f'{lang:.1f},{frei(grad)},{frei(lang)}'
+                                + ('' if ALTE_PEILUNG else f',{"locator" if loc else "land"}')
+                                + ';')
             print(f'  {self.addr[1]}: {zeile}')
         elif name == 'spots':
             # Longpath filtert auf den sichtbaren Ausschnitt. Die Attrappe

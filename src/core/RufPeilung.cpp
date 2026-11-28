@@ -7,6 +7,11 @@
 namespace Longpath {
 namespace RufPeilung {
 
+bool istLocator(const QString& text)
+{
+    return isValidGridSquare(text.trimmed());
+}
+
 Ergebnis rechne(const CtyDatParser& cty, const QString& rufzeichen,
                 const QString& eigenerLocator)
 {
@@ -19,6 +24,16 @@ Ergebnis rechne(const CtyDatParser& cty, const QString& rufzeichen,
         // Ohne eigenen Standort gibt es keine Richtung -- und eine Peilung
         // "von irgendwo" waere eine Zahl, die nach etwas aussieht.
         e.grund = QStringLiteral("eigener locator fehlt");
+        return e;
+    }
+
+    if (istLocator(ruf)) {
+        // Der genaue Ort -- kein Land, keine Schaetzung.
+        e.kurzGrad   = BeamHeading::wrap360(calculateBearingInDegrees(mein, ruf));
+        e.langGrad   = BeamHeading::longPath(e.kurzGrad);
+        e.km         = calculateDistanceKm(mein, ruf);
+        e.ausLocator = true;
+        e.ok         = true;
         return e;
     }
 

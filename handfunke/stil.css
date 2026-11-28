@@ -628,7 +628,8 @@ header{height:32px}
 #rotorFeld .rotorKopf{display:flex;align-items:center;gap:10px;cursor:pointer;margin:0}
 #rotorFeld .rotorKopf b{font:600 var(--f-sub)/1 var(--mono);color:var(--text);letter-spacing:0}
 #rotorFeld .rotorKopf .chev{margin-left:auto;color:#6b6b71}
-#rotorFeld:not(.offen) .rotorreihe{display:none}
+#rotorFeld:not(.offen) .rotorreihe,#rotorFeld:not(.offen) .rotorRuf,
+#rotorFeld:not(.offen) .rotorPeil{display:none}
 #rotorFeld.offen .rotorKopf{margin-bottom:8px}
 /* Sendeleiste fest unten, Fusszeile darunter */
 .txrow{position:fixed;left:0;right:0;bottom:26px;margin:0;padding:12px 12px 4px;
@@ -886,3 +887,26 @@ footer #onAir.an{color:var(--tx-border)}
 .sperrMarke.stoss{animation:sperrStoss .6s ease-out}
 @keyframes sperrStoss{0%{background:rgba(216,165,95,.45);color:#111}100%{background:transparent}}
 .vfo.gesperrt .hz{opacity:.72}
+
+/* ═══ Rotor per Rufzeichen oder Locator (2026-11-27, Entwurf A) ══════════════
+   Eingabezeile unter der Scheibe, Antwort darunter wie in der FT8-Liste:
+   Zahl in Orange (gemessen/gerechnet), KURZ/LANG flach, gesperrt grau. */
+.rotorRuf{display:flex;gap:8px;margin-top:10px}
+.rotorRuf input{flex:1;min-width:0;box-sizing:border-box;height:40px;padding:0 12px;
+  border-radius:10px;background:var(--inset);border:1px solid rgba(0,0,0,.8);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.8);
+  color:var(--text);font:600 16px/1 var(--mono);letter-spacing:.08em;
+  text-transform:uppercase}  /* 16 px: darunter zoomt iOS beim Antippen */
+.rotorRuf input::placeholder{color:var(--text-inactive);font-weight:500;letter-spacing:.1em;
+  font-size:var(--f-small)}
+.rotorRuf input:focus{outline:none;border-color:#f6c25e}
+.rotorPeilen{flex:none;height:40px;padding:0 14px;border-radius:10px;background:var(--flat);
+  border:1px solid var(--border);color:var(--text3);font:600 var(--f-caption)/1 inherit;
+  letter-spacing:.12em}
+.rotorPeilen:active{border-color:#f6c25e;color:var(--orT)}
+.rotorPeil{padding:8px 2px 2px}
+.rotorPeil[hidden]{display:none}
+.rotorPeil .pText{display:flex;flex-direction:column;gap:3px;min-width:0}
+.rotorPeil .pText b{font:600 var(--f-body)/1 var(--mono);color:var(--text);letter-spacing:.04em}
+.rotorPeil .pText i{font-style:normal;color:var(--orT);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}

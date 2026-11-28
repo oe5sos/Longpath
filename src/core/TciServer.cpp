@@ -3415,9 +3415,14 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
         // der Netzdienst greift nur nicht hinein.
         // ── Peilung zu einem Rufzeichen (2026-11-26) ────────────────────────
         //
-        //     rotor_peilung:<ruf>;
-        //       -> rotor_peilung:<RUF>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>;
+        //     rotor_peilung:<ruf oder locator>;
+        //       -> rotor_peilung:<RUF>,<kurz>,<km>,<land>,<lang>,<kurzFrei>,<langFrei>,<quelle>;
         //       oder rotor_peilung_err:<RUF>,<grund>;
+        //
+        // `<quelle>` (seit 2026-11-27, angehaengt -- aeltere Seiten lesen nur
+        // die ersten sieben Felder): `land` = Mitte der DXCC-Einheit (grob),
+        // `locator` = der genannte Locator selbst (genau; `<land>` ist dann
+        // leer). Die App sagt damit, wie weit sie der Zahl trauen kann.
         //
         // Fuer die FT8-Liste der App: Station antippen, Richtung sehen. Die
         // Rechnung ist die des Rotor-Felds am Mac (RufPeilung, cty.dat, Mitte
@@ -3440,12 +3445,14 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 const QString ruf =
                     TciFeld::sicher(t.mid(14).section(QLatin1Char(','), 0, 0)).toUpper();
                 DxccColorProvider* dxcc = m_model ? m_model->dxccColorProvider() : nullptr;
-                if (!dxcc) {
+                // Ein Locator braucht kein cty.dat -- dann genuegt ein leeres.
+                if (!dxcc && !RufPeilung::istLocator(ruf)) {
                     antwort(QStringLiteral("rotor_peilung_err:%1,kein cty.dat;").arg(ruf));
                     return;
                 }
+                static const CtyDatParser kOhneCty;
                 const RufPeilung::Ergebnis e = RufPeilung::rechne(
-                    dxcc->ctyDat(), ruf,
+                    dxcc ? dxcc->ctyDat() : kOhneCty, ruf,
                     AppSettings::instance().value(QStringLiteral("StationGridSquare"),
                                                   QString{}).toString());
                 if (!e.ok) {
@@ -3456,14 +3463,16 @@ void TciServer::onTextMessageReceived(const QString& rohMsg)
                 RotorController* rot = m_model ? m_model->rotor() : nullptr;
                 const bool kurzFrei = rot && rot->zielErlaubt(e.kurzGrad);
                 const bool langFrei = rot && rot->zielErlaubt(e.langGrad);
-                antwort(QStringLiteral("rotor_peilung:%1,%2,%3,%4,%5,%6,%7;")
+                antwort(QStringLiteral("rotor_peilung:%1,%2,%3,%4,%5,%6,%7,%8;")
                             .arg(ruf)
                             .arg(e.kurzGrad, 0, 'f', 1)
                             .arg(qRound(e.km))
                             .arg(TciFeld::sicher(e.land))
                             .arg(e.langGrad, 0, 'f', 1)
                             .arg(kurzFrei ? 1 : 0)
-                            .arg(langFrei ? 1 : 0));
+                            .arg(langFrei ? 1 : 0)
+                            .arg(e.ausLocator ? QStringLiteral("locator")
+                                              : QStringLiteral("land")));
                 return;
             }
         }
