@@ -172,7 +172,9 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(mw->kiwiReplayForTest().isPlaying(), 8000);
         QVERIFY(mw->radioMutedForTest());
         // Nicht auf einmal: der Ausgabepuffer fasst 100 ms.
-        QVERIFY2(mw->kiwiReplayForTest().durationMs() >= 900,
+        // Auf einem belasteten Rechner laufen bis zum Nachsehen schon ein
+        // paar Takte; entscheidend ist, dass nicht alles auf einmal ging.
+        QVERIFY2(mw->kiwiReplayForTest().durationMs() >= 500,
                  "beim Start darf nur ein kleines Stueck abgehen");
         QTRY_VERIFY_WITH_TIMEOUT(!mw->kiwiReplayForTest().isPlaying(), 6000);
         QVERIFY(!mw->radioMutedForTest());

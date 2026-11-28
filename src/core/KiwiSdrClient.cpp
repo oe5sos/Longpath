@@ -808,6 +808,11 @@ void KiwiSdrClient::handleStatusPreflightFinished(QNetworkReply* reply)
                                           httpStatus,
                                           errorText));
         cleanupSockets();
+        // Beide Male keine Antwort ueberhaupt: ein Netzfehler, dem weitere
+        // Versuche folgen duerfen. Eine Absage (HTTP-Status) bleibt eine.
+        if (m_statusPreflightFirstHttpStatus <= 0 && httpStatus <= 0) {
+            emit setupTransportFailed();
+        }
         return;
     }
 

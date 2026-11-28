@@ -15,6 +15,8 @@
 #include <QImage>
 #include <QToolButton>
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QMenu>
 #include <QTemporaryDir>
 
@@ -202,6 +204,50 @@ private slots:
         QCOMPARE(KiwiSdrManager::reconnectDelayMs(2), 30000);
         QCOMPARE(KiwiSdrManager::reconnectDelayMs(3), 60000);
         QCOMPARE(KiwiSdrManager::reconnectDelayMs(4), -1);
+    }
+
+    // 2026-11-28 an Martins Station: Tonstrom stand, der naechste Versuch
+    // bekam die Statusseite nicht (Zeitueberschreitung) -- und dann kam kein
+    // weiterer mehr.
+    void unerreichbareStatusseiteZaehltAlsNetzfehler()
+    {
+        quint16 deadPort = 0;
+        {
+            QTcpServer probe;
+            QVERIFY(probe.listen(QHostAddress::LocalHost, 0));
+            deadPort = probe.serverPort();
+        }
+        KiwiSdrClient client;
+        client.setOperatorCallsign(QStringLiteral("OE5SOS"));
+        QSignalSpy failed(&client, &KiwiSdrClient::setupTransportFailed);
+        client.connectToEndpoint(QStringLiteral("127.0.0.1:%1").arg(deadPort));
+        QTRY_COMPARE_WITH_TIMEOUT(client.state(), KiwiSdrClient::State::Error, 20000);
+        QCOMPARE(failed.count(), 1);
+    }
+
+    // Eine Absage des Servers bleibt eine Absage: kein weiterer Versuch.
+    void abgelehnteStatusseiteIstKeinNetzfehler()
+    {
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+        connect(&server, &QTcpServer::newConnection, &server, [&server]() {
+            while (QTcpSocket* s = server.nextPendingConnection()) {
+                connect(s, &QTcpSocket::readyRead, s, [s]() {
+                    // TLS-Anlauf (https-Versuch) einfach schliessen.
+                    if (s->peek(3) != "GET") { s->abort(); return; }
+                    s->readAll();
+                    s->write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n"
+                             "Connection: close\r\n\r\n");
+                    s->disconnectFromHost();
+                });
+            }
+        });
+        KiwiSdrClient client;
+        client.setOperatorCallsign(QStringLiteral("OE5SOS"));
+        QSignalSpy failed(&client, &KiwiSdrClient::setupTransportFailed);
+        client.connectToEndpoint(QStringLiteral("127.0.0.1:%1").arg(server.serverPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(client.state(), KiwiSdrClient::State::Error, 20000);
+        QCOMPARE(failed.count(), 0);
     }
 
     void derStreifenZeigtSWertUndUebersteuerung()
