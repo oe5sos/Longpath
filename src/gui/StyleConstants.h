@@ -273,6 +273,11 @@ constexpr auto kInsetBg         = "#050507";   // war #08080a (= kAppBg!)
 // Verlaufsanfang einer Mulde -- bewusst eine Stufe heller als kInsetBg,
 // nicht derselbe Wert: der Verlauf braucht beide Enden.
 constexpr auto kInsetBgTop      = "#101014";
+// Zusaetzlich waehlbare Gruende der Kiwi-Wasserfaelle (2026-11-28), Vorgabe
+// bleibt Schwarz. Siehe gui/KiwiWaterfallBackground.h.
+constexpr auto kKiwiBgAnthracite = "#242427";
+constexpr auto kKiwiBgWarmGrey   = "#2b2825";
+constexpr auto kKiwiBgMediumGrey = "#3a3a3d";
 constexpr auto kInsetBorder     = "#232329";   // war #1e2e3e
 constexpr auto kGroove          = "#1f1f23";   // war #203040
 

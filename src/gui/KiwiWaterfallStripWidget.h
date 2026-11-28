@@ -79,6 +79,8 @@ public:
     // "man sollte dies als Option generell aendern koennen").
     void loadOptions();
     void saveOptions() const;
+    // Farbe der untersten Wasserfallstufe, wie zuletzt gemalt.
+    QColor floorColorForTest() const;
 
 signals:
     // Eine allgemeine Einstellung wurde hier geaendert: die anderen Streifen
@@ -132,7 +134,12 @@ private:
     QString m_profileId;
     QLabel* m_nameLabel{nullptr};
     QLabel* m_peakLabel{nullptr};
+    // Je Bildpunkt die Stufe 0..255; die Farben stehen in der Farbtafel, so
+    // wechselt der Grund auch fuer die schon gemalten Zeilen.
     QImage m_history;
+    QColor m_floor;
+    void newHistory(int width);
+    void applyFloor();
     KiwiLostOverlay* m_lost{nullptr};
 };
 

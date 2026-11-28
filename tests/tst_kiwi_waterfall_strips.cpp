@@ -6,9 +6,14 @@
 #include <QSignalSpy>
 #include <QToolButton>
 #include <QLabel>
+#include <QMenu>
+#include <memory>
 
 #include "core/AppSettings.h"
 #include "core/KiwiSdrClient.h"
+#include "gui/KiwiOwnSignalStrip.h"
+#include "gui/KiwiWaterfallBackground.h"
+#include "gui/StyleConstants.h"
 #include "gui/KiwiWaterfallPanel.h"
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "models/RadioModel.h"
@@ -26,6 +31,72 @@ class TstKiwiWaterfallStrips : public QObject
 {
     Q_OBJECT
 private slots:
+    // 2026-11-28, Betreiber: hellere Gruende nur beim Kiwi-Wasserfall, nur
+    // als zusaetzliche Wahl.
+    void hellererGrundIstEineWahl()
+    {
+        KiwiBackground::set(QStringLiteral("Black"));
+        RadioModel model;
+        KiwiWaterfallPanel panel(&model);
+        panel.setStripEnabled(QStringLiteral("a"), true, QStringLiteral("Eins"));
+        panel.resize(500, 300);
+        panel.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&panel, 15000));
+        auto* strip = panel.stripForTest(QStringLiteral("a"));
+        strip->setRange(-110.0f, -40.0f);
+        QVector<float> row = bins(-130.0f);                 // unter dem Bereich: Grund
+        for (int i = 380; i < 420; ++i) { row[i] = -40.0f; } // volles Signal
+        panel.pushRow(QStringLiteral("a"), row, 14185000.0, 14225000.0);
+
+        // Bildpunkte: im Wasserfall neben dem Signal, im Signal, in der Kopfzeile.
+        auto grab = [strip]() { return strip->grab().toImage(); };
+        auto at = [](const QImage& img, double fx, int y) {
+            const double dpr = img.devicePixelRatio();
+            const int x = 9 + int(fx * (img.width() / dpr - 18));
+            return img.pixelColor(int(x * dpr), int(y * dpr));
+        };
+        const QImage dark = grab();
+        const QColor darkGround = at(dark, 0.25, 31);
+        const QColor signal = at(dark, 400.0 / 512.0, 30);
+        QVERIFY2(darkGround.lightness() < 20, qPrintable(darkGround.name()));
+
+        KiwiBackground::set(QStringLiteral("Anthracite"));
+        const QImage grey = grab();
+        const QColor want(Style::kKiwiBgAnthracite);
+        QCOMPARE(at(grey, 0.25, 31).name(), want.name());   // schon gemalte Zeile
+        QCOMPARE(at(grey, 0.25, 5).name(), want.name());    // Kopfzeile
+        QCOMPARE(at(grey, 400.0 / 512.0, 30).name(), signal.name()); // Signal bleibt
+
+        KiwiBackground::set(QStringLiteral("Black"));
+        QCOMPARE(at(grab(), 0.25, 31).name(), darkGround.name());
+    }
+
+    // Derselbe Grund im Streifen "Mein Signal", gewaehlt ueber sein Zahnrad.
+    void meinSignalNimmtDenselbenGrund()
+    {
+        KiwiBackground::set(QStringLiteral("Black"));
+        KiwiOwnSignalStrip strip;
+        strip.resize(500, 200);
+        // Unten rechts: Grund des Streifens, ausserhalb von Kopf und Bild.
+        auto ground = [&strip]() {
+            const QImage img = strip.grab().toImage();
+            return img.pixelColor(img.width() - 3, img.height() - 3);
+        };
+        const QColor before = ground();
+        std::unique_ptr<QMenu> menu(strip.buildOptionsMenu(nullptr));
+        QAction* anthracite = nullptr;
+        for (QAction* a : menu->actions()) {
+            if (a->text() == QStringLiteral("Anthracite")) { anthracite = a; }
+        }
+        QVERIFY(anthracite);
+        anthracite->trigger();
+        QCOMPARE(KiwiBackground::current(), QStringLiteral("Anthracite"));
+        QCOMPARE(ground().name(),
+                 QColor(Style::kKiwiBgAnthracite).name());
+        KiwiBackground::set(QStringLiteral("Black"));
+        QCOMPARE(ground().name(), before.name());
+    }
+
     void streifenWachsenMitDemFenster()
     {
         RadioModel model;

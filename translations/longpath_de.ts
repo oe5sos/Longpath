@@ -2,6 +2,29 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="de_DE">
 <context>
+    <name>KiwiBackground</name>
+    <message>
+        <source>Background</source>
+        <translation>Hintergrund</translation>
+    </message>
+    <message>
+        <source>Black</source>
+        <translation>Schwarz</translation>
+    </message>
+    <message>
+        <source>Anthracite</source>
+        <translation>Anthrazit</translation>
+    </message>
+    <message>
+        <source>Warm grey</source>
+        <translation>Warmgrau</translation>
+    </message>
+    <message>
+        <source>Medium grey</source>
+        <translation>Mittelgrau</translation>
+    </message>
+</context>
+<context>
     <name>ChromeBar</name>
     <message>
         <location filename="../src/gui/chrome/ChromeBarItems.cpp" line="74"/>

@@ -8,6 +8,7 @@
 
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
+#include "gui/KiwiWaterfallBackground.h"
 #include "gui/Zahlentext.h"
 #include "gui/widgets/KiwiLostOverlay.h"
 
@@ -29,6 +30,13 @@
 namespace Longpath {
 
 namespace {
+
+// Der gewaehlte Grund, sonst die bisherige Farbe.
+QColor groundOr(const QColor& usual)
+{
+    const QColor grey = KiwiBackground::greyColor();
+    return grey.isValid() ? grey : usual;
+}
 
 constexpr int kHeaderH = 26;
 constexpr int kAxisH = 18;
@@ -235,6 +243,20 @@ QMenu* KiwiOwnSignalStrip::buildOptionsMenu(QWidget* parent)
            m_opt.brightness, 0, [](Options& o, int v) { o.brightness = v; });
     choice(tr("Contrast"), {tr("Soft"), tr("Normal contrast"), tr("Strong")},
            m_opt.contrast, 0, [](Options& o, int v) { o.contrast = v; });
+    // Gilt fuer alle Kiwi-Wasserfaelle, auch die im Fenster.
+    menu->addSection(KiwiBackground::menuTitle());
+    auto* grounds = new QActionGroup(menu);
+    for (const KiwiBackground::Choice& bg : KiwiBackground::kChoices) {
+        QAction* a = menu->addAction(KiwiBackground::label(bg));
+        a->setCheckable(true);
+        a->setChecked(KiwiBackground::current() == QLatin1String(bg.key));
+        grounds->addAction(a);
+        const QString key = QLatin1String(bg.key);
+        connect(a, &QAction::triggered, this, [this, key]() {
+            KiwiBackground::set(key);
+            update();
+        });
+    }
     menu->addSeparator();
     QAction* colour = menu->addAction(tr("Coloured waterfall"));
     colour->setCheckable(true);
@@ -275,7 +297,7 @@ QRect KiwiOwnSignalStrip::waterfallRect() const
 // Signals. Warm, weil gemessen.
 void KiwiOwnSignalStrip::paintTrace(QPainter& p, const QRect& r) const
 {
-    p.fillRect(r, QColor(Style::kInsetBg));
+    p.fillRect(r, groundOr(QColor(Style::kInsetBg)));
     if (m_rows.isEmpty() || r.width() <= 1 || r.height() <= 4
         || m_bandwidthHz <= 0.0) {
         return;
@@ -501,7 +523,8 @@ void KiwiOwnSignalStrip::renderBody(QImage& img) const
 {
     const int W = img.width();
     const int H = img.height();
-    img.fill(QColor(Style::kInsetBg));
+    const QColor grey = KiwiBackground::greyColor();
+    img.fill(grey.isValid() ? grey : QColor(Style::kInsetBg));
     if (m_rows.isEmpty() || W <= 0 || H <= 0 || m_bandwidthHz <= 0.0) { return; }
 
     // Rampe ueber dem Rauschen; Lage (Helligkeit) und Spanne (Kontrast)
@@ -526,7 +549,16 @@ void KiwiOwnSignalStrip::renderBody(QImage& img) const
             const double t = std::clamp(
                 (double(r.bins[bi]) - floorDbm) / spanDb, 0.0, 1.0);
             const int g = 18 + int(t * 237.0);
-            line[x] = m_opt.colour ? colourFor(t) : qRgb(g, g, g);
+            if (m_opt.colour) {
+                line[x] = colourFor(t);
+            } else if (grey.isValid()) {
+                // Vom gewaehlten Grund hinauf nach Weiss.
+                line[x] = qRgb(grey.red()   + int((255 - grey.red())   * t),
+                               grey.green() + int((255 - grey.green()) * t),
+                               grey.blue()  + int((255 - grey.blue())  * t));
+            } else {
+                line[x] = qRgb(g, g, g);
+            }
         }
     }
 }
@@ -600,13 +632,15 @@ bool KiwiOwnSignalStrip::soundActiveForTest() const { return m_soundButton->isCh
 void KiwiOwnSignalStrip::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
-    p.fillRect(rect(), QColor(Style::hexRole(Style::kAppBg)));
+    p.fillRect(rect(), groundOr(QColor(Style::hexRole(Style::kAppBg))));
 
     const QRect body = bodyRect();
 
     // ── Kopfzeile: Balken in Warm, Name/Entfernung/Verzug, Aussage ─────
     const QRect head(m_marginLeft, 0, body.width(), kHeaderH - 2);
-    p.fillRect(head, QColor(Style::hexRole(Style::kInsetBgTop)));
+    const QColor grey = KiwiBackground::greyColor();
+    p.fillRect(head, grey.isValid() ? grey.lighter(112)
+                                    : QColor(Style::hexRole(Style::kInsetBgTop)));
     p.fillRect(QRect(head.left(), head.top(), 3, head.height()), warm());
     p.setFont(Style::monoFont(font(), 11, QFont::DemiBold));
     p.setPen(ink());

@@ -9,6 +9,7 @@
 
 #include "core/AppSettings.h"
 #include "gui/StyleConstants.h"
+#include "gui/KiwiWaterfallBackground.h"
 #include "gui/styles/ThemeQss.h"
 #include "gui/widgets/KiwiLostOverlay.h"
 
@@ -200,8 +201,7 @@ KiwiWaterfallStripWidget::KiwiWaterfallStripWidget(const QString& profileId,
     setMinimumHeight(92);
     loadOptions();
 
-    m_history = QImage(1, kHistoryRows, QImage::Format_RGB32);
-    m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
+    newHistory(1);
 
     m_lost = new KiwiLostOverlay(this);
     connect(m_lost, &KiwiLostOverlay::chooseRequested, this,
@@ -242,7 +242,7 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
         // Anderer Bereich (+/-): der alte Verlauf passt nicht mehr zur Achse.
         const double old = m_highHz - m_lowHz;
         if (old > 0.0 && std::abs((highHz - lowHz) - old) > old * 0.01) {
-            m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
+            m_history.fill(0u);
             m_lastRowMs = -1000000;
         }
         m_lowHz = lowHz;
@@ -259,8 +259,7 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
     ++m_acceptedRows;
 
     if (m_history.width() != binsDbm.size()) {
-        m_history = QImage(binsDbm.size(), kHistoryRows, QImage::Format_RGB32);
-        m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
+        newHistory(binsDbm.size());
     } else {
         // Scroll the existing buffer down by one row IN PLACE instead of
         // allocating a brand-new kHistoryRows-tall QImage on every incoming
@@ -278,8 +277,6 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
                      static_cast<size_t>(bytesPerLine) * (kHistoryRows - 1));
     }
 
-    const QColor floor(Style::hexRole(Style::kAppBg));
-    const QColor peak(Style::kSpectrumTrace);
     if (m_auto) {
         // Rauschen (Median) bis zur Spitze der Zeile, mit einem Mindestabstand.
         QVector<float> sorted = binsDbm;
@@ -290,24 +287,48 @@ void KiwiWaterfallStripWidget::pushRow(const QVector<float>& binsDbm,
         m_maxDbm = std::max(top, median + 25.0f);
     }
     float maxDbm = m_minDbm;
+    uchar* line = m_history.scanLine(0);
     for (int x = 0; x < binsDbm.size(); ++x) {
         const float dbm = binsDbm[x];
         maxDbm = std::max(maxDbm, dbm);
         const float t = std::clamp((dbm - m_minDbm) / (m_maxDbm - m_minDbm), 0.0f, 1.0f);
-        const QColor c(
-            floor.red()   + int((peak.red()   - floor.red())   * t),
-            floor.green() + int((peak.green() - floor.green()) * t),
-            floor.blue()  + int((peak.blue()  - floor.blue())  * t));
-        m_history.setPixelColor(x, 0, c);
+        line[x] = uchar(t * 255.0f + 0.5f);
     }
 
     m_peakLabel->setText(QStringLiteral("%1 dBm").arg(qRound(maxDbm)));
     update();
 }
 
+void KiwiWaterfallStripWidget::newHistory(int width)
+{
+    m_history = QImage(width, kHistoryRows, QImage::Format_Indexed8);
+    m_floor = QColor();
+    applyFloor();
+    m_history.fill(0u);
+}
+
+QColor KiwiWaterfallStripWidget::floorColorForTest() const { return m_floor; }
+
+void KiwiWaterfallStripWidget::applyFloor()
+{
+    QColor floor = KiwiBackground::greyColor();
+    if (!floor.isValid()) { floor = QColor(Style::hexRole(Style::kAppBg)); }
+    if (floor == m_floor) { return; }
+    m_floor = floor;
+    const QColor peak(Style::kSpectrumTrace);
+    QList<QRgb> table(256);
+    for (int i = 0; i < 256; ++i) {
+        const float t = i / 255.0f;
+        table[i] = qRgb(floor.red()   + int((peak.red()   - floor.red())   * t),
+                        floor.green() + int((peak.green() - floor.green()) * t),
+                        floor.blue()  + int((peak.blue()  - floor.blue())  * t));
+    }
+    m_history.setColorTable(table);
+}
+
 void KiwiWaterfallStripWidget::reset()
 {
-    m_history.fill(QColor(Style::hexRole(Style::kAppBg)));
+    m_history.fill(0u);
     m_peakLabel->setText(QStringLiteral("—"));
     m_lowHz = 0.0;
     m_highHz = 0.0;
@@ -411,6 +432,15 @@ void KiwiWaterfallStripWidget::showOptionsMenu(const QPoint& globalPos)
         presetActs << a;
     }
     menu.addSeparator();
+    QMenu* bgMenu = menu.addMenu(KiwiBackground::menuTitle());
+    QList<QAction*> bgActs;
+    for (const KiwiBackground::Choice& bg : KiwiBackground::kChoices) {
+        QAction* a = bgMenu->addAction(KiwiBackground::label(bg));
+        a->setCheckable(true);
+        a->setChecked(KiwiBackground::current() == QLatin1String(bg.key));
+        bgActs << a;
+    }
+    menu.addSeparator();
     QAction* close = menu.addAction(tr("Remove waterfall"));
     QAction* chosen = menu.exec(globalPos);
     if (!chosen) { return; }
@@ -422,6 +452,10 @@ void KiwiWaterfallStripWidget::showOptionsMenu(const QPoint& globalPos)
         emit optionsChanged();
     } else if (chosen == close) {
         emit closeRequested(m_profileId);
+    } else if (bgActs.contains(chosen)) {
+        KiwiBackground::set(QLatin1String(
+            KiwiBackground::kChoices[bgActs.indexOf(chosen)].key));
+        emit optionsChanged();
     } else if (speedActs.contains(chosen)) {
         setRowIntervalMs(kSpeeds[int(speedActs.indexOf(chosen))].ms);
         saveOptions();
@@ -462,6 +496,16 @@ void KiwiWaterfallStripWidget::paintEvent(QPaintEvent* event)
 {
     QWidget::paintEvent(event);
     QPainter painter(this);
+    applyFloor();
+    // Gewaehlter Grund hinter Kopfzeile und Achse; der Rahmen bleibt.
+    if (const QColor grey = KiwiBackground::greyColor(); grey.isValid()) {
+        painter.save();
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(grey);
+        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 5, 5);
+        painter.restore();
+    }
     const bool axis = m_highHz > m_lowHz;
     const int axisH = axis ? 14 : 0;
     const QRect target(9, 30, width() - 18, height() - 39 - axisH);
