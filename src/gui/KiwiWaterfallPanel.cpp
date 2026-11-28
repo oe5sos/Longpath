@@ -33,8 +33,7 @@ KiwiWaterfallPanel::KiwiWaterfallPanel(RadioModel* model, QWidget* parent)
     root->setSpacing(8);
 
     m_emptyLabel = new QLabel(
-        tr("No waterfall switched on — switch one on per receiver in the "
-            "KiwiSDR panel."), this);
+        tr("No Kiwi running — double-click one in the KiwiSDR panel."), this);
     m_emptyLabel->setTextFormat(Qt::PlainText);
     m_emptyLabel->setWordWrap(true);
     m_emptyLabel->setStyleSheet(

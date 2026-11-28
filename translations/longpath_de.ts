@@ -3411,8 +3411,8 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
     <name>Longpath::KiwiWaterfallPanel</name>
     <message>
         <location filename="../src/gui/KiwiWaterfallPanel.cpp" line="34"/>
-        <source>No waterfall switched on — switch one on per receiver in the KiwiSDR panel.</source>
-        <translation>Kein Wasserfall eingeschaltet — im KiwiSDR-Panel je Empfänger einschalten.</translation>
+        <source>No Kiwi running — double-click one in the KiwiSDR panel.</source>
+        <translation>Kein Kiwi aktiv — im KiwiSDR-Panel einen doppelklicken.</translation>
     </message>
     <message>
         <source>All Kiwis:</source>

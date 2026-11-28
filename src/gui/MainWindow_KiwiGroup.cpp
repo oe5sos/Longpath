@@ -110,8 +110,8 @@ void MainWindow::wireKiwiGroup()
             [this](const QString& id) {
         if (!m_kiwiSdrManager || !m_kiwiSdrManager->hasProfile(id)) { return; }
         m_kiwiSdrManager->setWaterfallPreviewEnabled(id, true);
-        if (m_appletVis) { m_appletVis->ensureVisible(QStringLiteral("KiwiWaterfalls")); }
-        kiwiFensterNachVorn(m_kiwiWaterfallPanel, this);
+        // Legt den Streifen auch dann an, wenn der Haken schon gesetzt war.
+        zeigeKiwiFenster(id);
     });
     m_kiwiSoloTimer = new QTimer(this);
     m_kiwiSoloTimer->setSingleShot(true);
@@ -165,7 +165,8 @@ void MainWindow::wireKiwiGroup()
     // Ton je Kiwi (Schalter im Streifen der KIWI-WASSERFAELLE).
     if (m_kiwiWaterfallPanel) {
         // Ein leeres Fenster braucht niemand (Betreiber 2026-11-25): es geht
-        // mit dem letzten Streifen zu und mit dem ersten auf.
+        // mit dem letzten Streifen zu und mit dem ersten auf. Wer es selbst
+        // holt, behaelt es (2026-11-28: ein Sekundentakt schloss es wieder).
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::emptyChanged, this,
                 [this](bool empty) {
             if (m_appletVis) {
@@ -175,6 +176,16 @@ void MainWindow::wireKiwiGroup()
             if (!empty) { kiwiFensterNachVorn(m_kiwiWaterfallPanel, this); }
         });
         QTimer::singleShot(0, this, [this]() {
+            // Den Verwalter gibt es erst nach dem Verdrahten hier.
+            if (m_appletVis) {
+                connect(m_appletVis, &AppletVisibilityController::visibilityChanged, this,
+                        [this](const QString& id, bool visible) {
+                    if (visible && id == QLatin1String("KiwiWaterfalls")) {
+                        syncKiwiWindowStrips();
+                    }
+                }, Qt::QueuedConnection);
+                syncKiwiWindowStrips();   // beim Start schon offen
+            }
             refreshKiwiSoundButtons();
             if (m_appletVis && m_kiwiWaterfallPanel
                 && m_kiwiWaterfallPanel->stripForTest(QString()) == nullptr
@@ -185,6 +196,13 @@ void MainWindow::wireKiwiGroup()
                 }
                 if (!any) { m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), false); }
             }
+        });
+        // Gemerkte WF-Haken bauen beim Start keinen Streifen (nichts soll von
+        // selbst aufspringen). Ist das Fenster offen, zeigt es jeden
+        // laufenden Kiwi.
+        connect(m_kiwiSdrManager, &KiwiSdrManager::profileStateChanged, this,
+                [this](const QString&, KiwiSdrClient::State, const QString&) {
+            syncKiwiWindowStrips();
         });
         connect(m_kiwiWaterfallPanel, &KiwiWaterfallPanel::soundToggled, this,
                 [this](const QString& id, bool on) { setKiwiSound(id, on); });
@@ -279,10 +297,6 @@ void MainWindow::wireKiwiGroup()
             && !m_kiwiSdrManager->profile(m_kiwiOwnProfileId).waterfallPreviewEnabled) {
             m_kiwiSdrManager->setWaterfallPreviewEnabled(m_kiwiOwnProfileId, true);
         }
-        if (m_appletVis && m_kiwiWaterfallPanel && m_kiwiWaterfallPanel->isEmptyForTest()
-            && m_kiwiWaterfallPanel->isVisible()) {
-            m_appletVis->setVisible(QStringLiteral("KiwiWaterfalls"), false);
-        }
         sendKiwiGroupTracking();
         refreshKiwiHearingDialog();
     });
@@ -355,6 +369,32 @@ void MainWindow::setKiwiEvictsPrograms(const QString& profileId, bool evicts)
     if (evicts) { ids.append(profileId); } else { ids.removeAll(profileId); }
     AppSettings::instance().setValue(kKiwiEvictingKey, ids.join(QLatin1Char(';')));
     refreshKiwiSdrAppletReceivers();
+}
+
+void MainWindow::syncKiwiWindowStrips()
+{
+    if (!m_kiwiSdrManager || !m_kiwiWaterfallPanel || !m_appletVis
+        || !m_appletVis->isEffectivelyVisible(QStringLiteral("KiwiWaterfalls"))) {
+        return;
+    }
+    bool added = false;
+    for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {
+        if (!pr.waterfallPreviewEnabled
+            || m_kiwiWaterfallPanel->stripForTest(pr.id)) {
+            continue;
+        }
+        const KiwiSdrClient::State st = m_kiwiSdrManager->state(pr.id);
+        if (st != KiwiSdrClient::State::Connecting
+            && st != KiwiSdrClient::State::Connected
+            && st != KiwiSdrClient::State::Waiting
+            && st != KiwiSdrClient::State::Camping) {
+            continue;
+        }
+        m_kiwiWaterfallPanel->setStripEnabled(
+            pr.id, true, m_kiwiSdrManager->displayName(pr.id));
+        added = true;
+    }
+    if (added) { refreshKiwiSoundButtons(); }
 }
 
 void MainWindow::zeigeKiwiFenster(const QString& profileId)

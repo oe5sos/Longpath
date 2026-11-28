@@ -16,6 +16,7 @@
 #include <QAbstractButton>
 #include <QLabel>
 #include <QtTest>
+#include <QSignalBlocker>
 #include <QListWidget>
 #include <QPushButton>
 #include <QPointer>
@@ -35,6 +36,7 @@
 #include "gui/KiwiWaterfallStripWidget.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/MainWindow.h"
+#include "gui/applets/AppletVisibilityController.h"
 #include "gui/widgets/KiwiLostOverlay.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
@@ -338,6 +340,82 @@ private slots:
         QVERIFY(!panel->stripForTest(ids[0])->isHidden());
         QTest::mouseClick(panel->stripForTest(ids[0])->expandButtonForTest(), Qt::LeftButton);
         QVERIFY(!panel->stripForTest(ids[1])->isHidden());
+    }
+
+    // 2026-11-28, Betreiber: "Kiwi Wasserfaelle geht nach einer Sekunde immer
+    // automatisch zu". Gemerkte WF-Haken bauen beim Start keinen Streifen; der
+    // Sekundentakt schloss das leere Fenster, so oft man es auch holte.
+    void dasGeholteFensterBleibtOffen()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        AppletVisibilityController* vis = mw->appletVisibilityForTest();
+        const QString win = QStringLiteral("KiwiWaterfalls");
+        vis->ensureVisible(win);
+        // Beim Betreiber ist es ein eigenes Fenster; offscreen steht das
+        // Panel in der Spalte, die dafuer sichtbar sein muss.
+        KiwiWaterfallPanel* shown = mw->kiwiWaterfallPanelForTest();
+        for (QWidget* w = shown->parentWidget(); w; w = w->parentWidget()) {
+            if (w->isHidden()) { w->show(); }
+        }
+        QTRY_VERIFY(shown->isVisible());
+        QTest::qWait(1600);
+        QVERIFY2(vis->isEffectivelyVisible(win), "das Fenster ging von selbst zu");
+
+        // Mit dem letzten Streifen geht es weiterhin zu.
+        const QString id = profile(mgr, "Kurz", 85);
+        mgr->setWaterfallPreviewEnabled(id, true);
+        QVERIFY(vis->isEffectivelyVisible(win));
+        mgr->setWaterfallPreviewEnabled(id, false);
+        QVERIFY(!vis->isEffectivelyVisible(win));
+    }
+
+    // Der Haken vom letzten Mal: verbunden oder nicht, wer das Fenster holt,
+    // sieht den Kiwi.
+    void gemerkterKiwiStehtImGeholtenFenster()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        AppletVisibilityController* vis = mw->appletVisibilityForTest();
+        const QString win = QStringLiteral("KiwiWaterfalls");
+        vis->setVisible(win, false);
+        KiwiWaterfallPanel* panel = mw->kiwiWaterfallPanelForTest();
+
+        QTcpServer stumm;
+        QVERIFY(stumm.listen(QHostAddress::LocalHost, 0));
+        const QString laeuft = profile(mgr, "Laeuft", stumm.serverPort());
+        const QString aus = profile(mgr, "Aus", 86);
+        {
+            // Wie nach dem Start: Haken gesetzt, kein Streifen.
+            const QSignalBlocker block(mgr);
+            mgr->setWaterfallPreviewEnabled(laeuft, true);
+            mgr->setWaterfallPreviewEnabled(aus, true);
+        }
+        mgr->disconnectProfile(aus);
+        QTest::qWait(500);   // spaete Meldungen des Client-Fadens abwarten
+        mgr->setStateForTest(aus, KiwiSdrClient::State::Disconnected);
+        mgr->setStateForTest(laeuft, KiwiSdrClient::State::Connected);
+        QCOMPARE(mgr->state(aus), KiwiSdrClient::State::Disconnected);
+        QVERIFY(!panel->stripForTest(laeuft));
+        QVERIFY(!vis->isEffectivelyVisible(win));   // nichts springt von selbst auf
+
+        vis->ensureVisible(win);
+        QTRY_VERIFY(panel->stripForTest(laeuft));
+        QVERIFY(!panel->stripForTest(aus));         // Getrennte bleiben weg
+
+        // "Fenster oeffnen" im KiwiSDR-Panel holt auch einen getrennten.
+        emit mw->kiwiSdrAppletForTest()->openWindowRequested(aus);
+        QTRY_VERIFY(panel->stripForTest(aus));
+        QTest::qWait(1600);
+        QVERIFY(vis->isEffectivelyVisible(win));
     }
 
     // "Radio stumm": nur mit einem hoerbaren Kiwi, nur Wiedergabe, geht von

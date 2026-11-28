@@ -1740,6 +1740,7 @@ private:
     void setKiwiSound(const QString& profileId, bool on);
     void zeigeKiwiFenster(const QString& profileId = QString());   // KIWI-WASSERFAELLE erzwungen einblenden, nach vorn
     void refreshKiwiSoundButtons();
+    void syncKiwiWindowStrips();   // offenes Fenster: Streifen je laufendem Kiwi
     void setRadioMuted(bool on);
     void zoomKiwiStrip(const QString& profileId, int direction);
     void setAllKiwiSound(bool on);
