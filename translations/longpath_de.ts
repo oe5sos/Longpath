@@ -3613,6 +3613,10 @@ Disable for manual OC pin control.&lt;/i&gt;</source>
         <translation>Trennt Programme nach 10 s, wenn seine Programm-Plätze voll sind.</translation>
     </message>
     <message>
+        <source>No picture — this Kiwi has no free waterfall channel</source>
+        <translation>Kein Bild — dieser Kiwi hat keinen freien Wasserfall-Kanal</translation>
+    </message>
+    <message>
         <source>This Kiwi has no free waterfall channel — nothing to show. Choose another Kiwi.</source>
         <translation>Dieser Kiwi hat keinen freien Wasserfall-Kanal — hier gibt es nichts zu zeigen. Wähle einen anderen Kiwi.</translation>
     </message>

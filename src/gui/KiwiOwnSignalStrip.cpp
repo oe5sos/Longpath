@@ -579,6 +579,13 @@ void KiwiOwnSignalStrip::setLost(const QString& title, const QString& detail)
 {
     m_lost->setGeometry(bodyRect());
     m_lost->setLost(title, detail);
+    update();
+}
+
+QString KiwiOwnSignalStrip::bodyText() const
+{
+    if (!m_lost->isHidden() || !m_rows.isEmpty()) { return QString(); }
+    return tr("waiting for picture from the Kiwi");
 }
 
 void KiwiOwnSignalStrip::setSoundActive(bool on)
@@ -621,10 +628,11 @@ void KiwiOwnSignalStrip::paintEvent(QPaintEvent*)
         QImage img(wf.size(), QImage::Format_RGB32);
         renderBody(img);
         p.drawImage(wf.topLeft(), img);
-        if (m_rows.isEmpty()) {
+        const QString middle = bodyText();
+        if (!middle.isEmpty()) {
             p.setFont(Style::monoFont(font(), 11, QFont::Normal));
             p.setPen(scale());
-            p.drawText(body, Qt::AlignCenter, tr("waiting for picture from the Kiwi"));
+            p.drawText(body, Qt::AlignCenter, middle);
         }
     }
     p.setPen(border());

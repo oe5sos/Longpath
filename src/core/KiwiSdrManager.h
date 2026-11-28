@@ -127,6 +127,17 @@ public:
     KiwiSdrProtocol::ReceiverMetadata receiverMetadata(const QString& id) const;
     KiwiSdrProtocol::ProtocolState protocolState(const QString& id) const;
     bool waterfallAvailable(const QString& id) const;
+    // Pruefstand: Zustand und Wasserfall-Kanal wie vom Client gemeldet.
+    void setStateForTest(const QString& id, KiwiSdrClient::State state)
+    {
+        m_states.insert(id, state);
+        emit profileStateChanged(id, state, QString());
+    }
+    void setWaterfallAvailableForTest(const QString& id, bool available)
+    {
+        m_waterfallAvailable.insert(id, available);
+        emit profileWaterfallAvailabilityChanged(id, available, QString());
+    }
     QString waterfallDetail(const QString& id) const;
     KiwiSdrWaterfallDisplayRange waterfallDisplayRange(
         const QString& id) const;

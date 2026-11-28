@@ -700,11 +700,22 @@ void MainWindow::setKiwiVolumeDb(const QString& profileId, int db)
 void MainWindow::refreshKiwiSoundButtons()
 {
     if (m_kiwiStrip && m_kiwiSdrManager && !m_kiwiOwnProfileId.isEmpty()) {
-        m_kiwiStrip->setLost(kiwiLostTitle(m_kiwiOwnProfileId),
-                             m_kiwiSdrManager->stateDetail(m_kiwiOwnProfileId));
         m_kiwiStrip->setSoundActive(
             m_kiwiSdrManager->assignedSliceForProfile(m_kiwiOwnProfileId) >= 0
             && !m_kiwiUserMuted.contains(m_kiwiOwnProfileId));
+        const KiwiSdrClient::State own = m_kiwiSdrManager->state(m_kiwiOwnProfileId);
+        const bool noPicture = (own == KiwiSdrClient::State::Connected
+                                || own == KiwiSdrClient::State::Camping)
+            && !m_kiwiSdrManager->waterfallAvailable(m_kiwiOwnProfileId);
+        // Ausgefallen oder ohne Bild: beides steht ueber dem Streifen, mit
+        // dem Knopf zu einem anderen Kiwi.
+        QString title = kiwiLostTitle(m_kiwiOwnProfileId);
+        QString detail = m_kiwiSdrManager->stateDetail(m_kiwiOwnProfileId);
+        if (title.isEmpty() && noPicture) {
+            title = tr("No picture — this Kiwi has no free waterfall channel");
+            detail = m_kiwiSdrManager->waterfallDetail(m_kiwiOwnProfileId);
+        }
+        m_kiwiStrip->setLost(title, detail);
     }
     if (!m_kiwiWaterfallPanel || !m_kiwiSdrManager) { return; }
     for (const KiwiSdrAntennaProfile& pr : m_kiwiSdrManager->profiles()) {

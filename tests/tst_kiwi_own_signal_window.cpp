@@ -16,6 +16,7 @@
 //
 // Longpath-eigener Pruefstand, kein Port.
 #include <QtTest>
+#include <QLabel>
 #include <QPushButton>
 #include <QScopeGuard>
 #include <QSignalSpy>
@@ -28,6 +29,7 @@
 #include "core/KiwiReplayBuffer.h"
 #include "gui/KiwiOwnSignalStrip.h"
 #include "gui/MainWindow.h"
+#include "gui/widgets/KiwiLostOverlay.h"
 #include "gui/applets/KiwiSdrApplet.h"
 #include "models/RadioModel.h"
 #include "models/SliceModel.h"
@@ -210,6 +212,48 @@ private slots:
         // Ton aus heisst aus.
         mw->closeKiwiForTest(a);
         QCOMPARE(mgr->assignedSliceForProfile(a), -1);
+        mw->setKiwiOwnSignalForTest(false);
+        clearProfiles(mgr);
+    }
+
+    // 2026-11-28 an Martins Station: f4kiy verbunden, aber alle Wasserfall-
+    // Kanaele belegt -- der Streifen stand auf "wartet auf Bild", fuer immer.
+    void ohneWasserfallKanalSagtDerStreifenEs()
+    {
+        auto* mw = new MainWindow();
+        mw->show();
+        QVERIFY(QTest::qWaitForWindowExposed(mw, 15000));
+        auto closeGuard = qScopeGuard([&]{ mw->close(); });
+
+        KiwiSdrManager* mgr = mw->kiwiSdrManagerForTest();
+        clearProfiles(mgr);
+        const QString a = mgr->addProfile(QStringLiteral("Voll"),
+                                          QStringLiteral("kiwi-v.example.at:8073"));
+        mw->setKiwiOwnSignalProfileForTest(a);
+        mw->setKiwiOwnSignalForTest(true);
+        KiwiOwnSignalStrip* strip = mw->kiwiOwnStripForTest();
+        QWidget* overlay = strip->lostOverlayForTest();
+        // Die Meldungen unten kommen sofort an (gleicher Faden); dazwischen
+        // laeuft keine Ereignisschleife, in der der echte Client mitredet.
+        mgr->setStateForTest(a, KiwiSdrClient::State::Connecting);
+        const QString waiting = strip->bodyText();
+        QVERIFY(!waiting.isEmpty());
+
+        mgr->setStateForTest(a, KiwiSdrClient::State::Connected);
+        mgr->setWaterfallAvailableForTest(a, false);
+        QVERIFY(!overlay->isHidden());
+        QVERIFY(strip->bodyText().isEmpty());
+        auto* title = overlay->findChild<QLabel*>(QStringLiteral("kiwiLostTitle"));
+        QVERIFY(title);
+        QVERIFY2(title->text().contains(QStringLiteral("waterfall")),
+                 qPrintable(title->text()));
+        // Mit dem Knopf zu einem anderen Kiwi, direkt am Streifen.
+        QVERIFY(overlay->findChild<QPushButton*>(QStringLiteral("kiwiLostChoose")));
+
+        // Kanal wieder frei: wieder "wartet", bis die erste Zeile kommt.
+        mgr->setWaterfallAvailableForTest(a, true);
+        QVERIFY(overlay->isHidden());
+        QCOMPARE(strip->bodyText(), waiting);
         mw->setKiwiOwnSignalForTest(false);
         clearProfiles(mgr);
     }

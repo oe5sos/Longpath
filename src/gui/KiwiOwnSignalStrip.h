@@ -108,6 +108,10 @@ public:
     void setLost(const QString& title, const QString& detail = QString());
     KiwiLostOverlay* lostOverlayForTest() const { return m_lost; }
 
+    // Was gemalt in der Mitte steht: "wartet" bis zur ersten Zeile --
+    // nicht, wenn der Ueberzug (setLost) schon sagt, was los ist.
+    QString bodyText() const;
+
     // Das Bild des Streifens (Wasserfall und Marke, ohne Kopf/Fuss) fuer
     // die Aufnahme als PNG. Leer, wenn noch keine Zeile kam.
     QImage waterfallImage(int width = 1200) const;
