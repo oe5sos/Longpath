@@ -82,13 +82,27 @@ class Station:
         nameplate: bool = True,
         geraete: Geraeteliste | None = None,
         ziel: Ziel | None = None,
+        nur_relais: bool = False,
+        relais_verbinder=None,
+        relais_verzoegerung_s: float | None = None,
     ) -> None:
+        # Die drei letzten sind Pruefhaken: ein Netz ohne UDP nachstellen
+        # und den Relay ueber einen Unix-Socket statt wss:// erreichen.
+        self._nur_relais = nur_relais
+        self._relais_verbinder = relais_verbinder
+        self._relais_verzoegerung = relais_verzoegerung_s
         self.url = dienst_url
         self.geraete = geraete if geraete is not None else Geraeteliste(
             Path(schluesselpfad).with_name("geraete.json")
         )
         self.ziel = ziel if ziel is not None else Ziel()
         self._sitzungen: dict[str, Any] = {}
+        # Kandidaten des Telefons, die ankommen, solange die Antwort noch
+        # entsteht (aiortc sammelt dabei mehrere Sekunden). Das Telefon darf
+        # schon trickeln, sobald seine Einfuehrung lebt (Abschnitt 6.3);
+        # ohne diese Ablage gingen genau die verloren, die im Mobilfunk den
+        # Weg bedeuten (der Server-Spiegel des Telefons hinter CGNAT).
+        self._wartende: dict[str, list[str]] = {}
         self._turn: dict | None = None
         self.privat = lade_schluessel(Path(schluesselpfad))
         self.oeffentlich = self.privat.public_key()
@@ -202,10 +216,9 @@ class Station:
             elif art == "credentials":
                 self._merke_turn(nachricht.get("turn"))
             elif art == "relay.grant":
-                # Der WebSocket-Relay aus Abschnitt 12. Noch nicht gebaut;
-                # die Zugangsdaten laufen in zwei Minuten ab, also wird
-                # hier nichts aufgehoben.
-                log.info("Relay angeboten (noch nicht gebaut)")
+                # Der WebSocket-Relay aus Abschnitt 12: das Bein sofort
+                # oeffnen, nicht erst nach der Kandidatensammlung (12.1).
+                asyncio.ensure_future(self._nimm_relais(nachricht))
             elif art == "candidate":
                 asyncio.ensure_future(self._nimm_kandidat(nachricht))
             elif art == "introduction.end":
@@ -312,6 +325,8 @@ class Station:
             return
 
         log.info("Einfuehrung von %s", geraet.name)
+        if woher:
+            self._wartende[woher] = []
         try:
             sitzung, antwort_sdp = await beantworte(
                 nachricht["offer"],
@@ -320,12 +335,17 @@ class Station:
                 self.lage.stun,
                 self._turn,
                 self.geraete,
+                nur_relais=self._nur_relais,
+                **({"relais_verzoegerung_s": self._relais_verzoegerung}
+                   if self._relais_verzoegerung is not None else {}),
             )
         except Exception:
             log.exception("die Antwort ist nicht zustande gekommen")
             return
 
         self._sitzungen[woher] = sitzung
+        for text in self._wartende.pop(woher, []):
+            await self._haenge_kandidat_ein(sitzung, text)
         await self._sende(
             {
                 "type": "answer",
@@ -349,18 +369,43 @@ class Station:
             self.lage.sitzungen = len(self._sitzungen)
             self._melde()
 
+    async def _nimm_relais(self, nachricht: dict) -> None:
+        """Das Relay-Angebot zu einer Einfuehrung annehmen (12.1).
+
+        Das Token ist undurchsichtig: es geht nur an den Relay unter `url`,
+        steht nie im Log und nie in der Adresse.
+        """
+        sitzung = self._sitzungen.get(nachricht.get("from"))
+        url, token = nachricht.get("url"), nachricht.get("token")
+        if sitzung is None or not isinstance(url, str) or not isinstance(token, str):
+            return
+        try:
+            await sitzung.relais_an(url, token, self._relais_verbinder)
+            log.info("Relay angenommen")
+        except Exception as e:
+            log.info("Relay nicht angenommen: %s", type(e).__name__)
+
     async def _nimm_kandidat(self, nachricht: dict) -> None:
         """Einen ICE-Kandidaten der Gegenseite einhaengen.
 
         Ein leerer Kandidat ist das Ende der Reihe und wird nicht
-        eingehaengt (Abschnitt 5.2).
+        eingehaengt (Abschnitt 5.2). Kommt er, bevor die Sitzung steht,
+        wird er aufgehoben und nach der Antwort eingehaengt.
         """
-        sitzung = self._sitzungen.get(nachricht.get("from"))
-        if sitzung is None:
+        if self._nur_relais:
             return
+        woher = nachricht.get("from")
         text = nachricht.get("candidate", "")
         if not text:
             return
+        sitzung = self._sitzungen.get(woher)
+        if sitzung is None:
+            if woher in self._wartende and len(self._wartende[woher]) < 64:
+                self._wartende[woher].append(text)
+            return
+        await self._haenge_kandidat_ein(sitzung, text)
+
+    async def _haenge_kandidat_ein(self, sitzung, text: str) -> None:  # noqa: ANN001
         try:
             from aiortc.sdp import candidate_from_sdp
 
@@ -380,6 +425,7 @@ class Station:
         `clientLeft` (Abschnitt 6.3). Wer hier die Sitzung mit abraeumt,
         wirft jede Verbindung nach ein paar Sekunden wieder hinaus.
         """
+        self._wartende.pop(woher or "", None)
         log.info("Einfuehrung %s zu Ende: %s", (woher or "?")[:8], code)
 
 
